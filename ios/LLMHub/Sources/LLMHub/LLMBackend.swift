@@ -20,6 +20,7 @@ class LLMBackend: ObservableObject {
     var topK: Int = 64
     var topP: Float = 0.95
     var temperature: Float = 1.0
+    var selectedBackend: String = "GPU"
     var enableVision: Bool = true
     var enableAudio: Bool = true
     var enableThinking: Bool = true
@@ -67,14 +68,15 @@ class LLMBackend: ObservableObject {
             throw NSError(domain: "LLMBackend", code: 403, userInfo: [NSLocalizedDescriptionKey: "Model not loaded"]) 
         }
         
-        let input = LMInput(text: prompt)
+        let input = try await container.prepare(input: UserInput(prompt: prompt))
         let params = GenerateParameters(maxTokens: self.maxTokens, temperature: self.temperature, topP: self.topP)
         
         let startTime = Date()
         var currentOutput = ""
         var tokens = 0
         
-        for await item in try MLXLMCommon.generate(input: input, parameters: params, context: container.context) {
+        let stream = try await container.generate(input: input, parameters: params)
+        for await item in stream {
             if Task.isCancelled { break }
             switch item {
             case .chunk(let text):

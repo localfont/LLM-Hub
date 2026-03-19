@@ -1,6 +1,8 @@
 import Foundation
 import SwiftUI
 
+private final class LocalizationBundleProbe {}
+
 // MARK: - Supported Languages matching Android locale XMLs
 enum AppLanguage: String, CaseIterable, Identifiable, Sendable {
     case systemDefault = "system"
@@ -123,7 +125,7 @@ final class AppSettings: ObservableObject {
         let code = activeLocalizationCode
         
         // 1. Gather all bundles to check
-        var bundlesToCheck: [Bundle] = [Bundle.module, Bundle.main]
+        var bundlesToCheck: [Bundle] = [Bundle.main, Bundle(for: LocalizationBundleProbe.self)]
         bundlesToCheck.append(contentsOf: Bundle.allBundles)
         
         // 2. Try target language in all bundles

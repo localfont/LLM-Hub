@@ -1,0 +1,57 @@
+name: LLMHub
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: "26.0"
+
+packages:
+  mlx-swift:
+    url: https://github.com/ml-explore/mlx-swift
+    from: 0.30.6
+  mlx-swift-lm:
+    url: https://github.com/ml-explore/mlx-swift-lm
+    from: 2.30.6
+  swift-transformers:
+    url: https://github.com/huggingface/swift-transformers
+    from: 1.1.9
+
+targets:
+  LLMHub:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    sources:
+      - path: Sources/LLMHub
+        excludes:
+          - check_strings.py
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.LLMHub
+        PRODUCT_NAME: LLMHub
+        SWIFT_VERSION: 6.0
+        CODE_SIGN_STYLE: Automatic
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 1.0
+        INFOPLIST_KEY_CFBundleDisplayName: LLMHub
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIStatusBarStyle: UIStatusBarStyleDefault
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+    dependencies:
+      - package: mlx-swift
+        product: MLX
+      - package: mlx-swift
+        product: MLXRandom
+      - package: mlx-swift
+        product: MLXNN
+      - package: mlx-swift
+        product: MLXOptimizers
+      - package: mlx-swift-lm
+        product: MLXLLM
+      - package: mlx-swift-lm
+        product: MLXLMCommon
+      - package: swift-transformers
+        product: Transformers
+      - sdk: Accelerate.framework

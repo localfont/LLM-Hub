@@ -1,5 +1,25 @@
 import SwiftUI
 
+private extension URLError.Code {
+    var isTransientDownloadFailure: Bool {
+        switch self {
+        case .networkConnectionLost,
+            .notConnectedToInternet,
+            .timedOut,
+            .cannotConnectToHost,
+            .cannotFindHost,
+            .dnsLookupFailed,
+            .resourceUnavailable,
+            .internationalRoamingOff,
+            .callIsActive,
+            .dataNotAllowed:
+            return true
+        default:
+            return false
+        }
+    }
+}
+
 // MARK: - Download ViewModel
 @MainActor
 class ModelDownloadViewModel: ObservableObject {
@@ -8,6 +28,7 @@ class ModelDownloadViewModel: ObservableObject {
     @Published var searchText: String = ""
     @Published var downloadStates: [String: DownloadState] = [:]
     @Published var expandedModelId: String? = nil
+    private let completionThresholdRatio: Double = 0.98
 
     init() {
         // Initialize with default states
@@ -24,6 +45,7 @@ class ModelDownloadViewModel: ObservableObject {
         for model in models {
             let modelDir = modelsDir.appendingPathComponent(model.id)
             var allExist = true
+            var totalLocalBytes: Int64 = 0
             
             if model.files.isEmpty {
                 allExist = false
@@ -34,17 +56,23 @@ class ModelDownloadViewModel: ObservableObject {
                         allExist = false
                         break
                     }
+                    if let attrs = try? FileManager.default.attributesOfItem(atPath: filePath.path),
+                        let fileSize = attrs[.size] as? Int64
+                    {
+                        totalLocalBytes += fileSize
+                    }
                 }
             }
             
-            if allExist {
+            let minimumExpectedBytes = Int64(Double(model.sizeBytes) * completionThresholdRatio)
+            if allExist && totalLocalBytes >= minimumExpectedBytes {
                 self.downloadStates[model.id] = .downloaded
             } else {
                 // If it's currently downloading in this session, don't overwrite
                 if case .downloading = downloadStates[model.id] {
                     continue
                 }
-                self.downloadStates[model.id] = .notDownloaded
+                self.downloadStates[model.id] = totalLocalBytes > 0 ? .paused : .notDownloaded
             }
         }
     }
@@ -64,6 +92,7 @@ class ModelDownloadViewModel: ObservableObject {
     }
 
     private var downloadTasks: [String: Task<Void, Never>] = [:]
+    private var autoResumableDownloads: Set<String> = []
 
     func startDownload(_ model: AIModel) {
         // Cancel existing task if any
@@ -105,6 +134,12 @@ class ModelDownloadViewModel: ObservableObject {
                 await MainActor.run {
                     self.downloadStates[model.id] = .paused
                 }
+            } catch let error as URLError where error.code.isTransientDownloadFailure {
+                await MainActor.run {
+                    // Treat temporary connection drops as recoverable; avoid surfacing noisy errors.
+                    self.downloadStates[model.id] = .paused
+                    self.autoResumableDownloads.insert(model.id)
+                }
             } catch {
                 await MainActor.run {
                     self.downloadStates[model.id] = .error(message: error.localizedDescription)
@@ -122,7 +157,18 @@ class ModelDownloadViewModel: ObservableObject {
 
     func resumeDownload(_ id: String) {
         if let model = models.first(where: { $0.id == id }) {
+            autoResumableDownloads.remove(id)
             startDownload(model)
+        }
+    }
+
+    func resumeAutoResumableDownloads() {
+        let ids = autoResumableDownloads
+        autoResumableDownloads.removeAll()
+        for id in ids {
+            if case .paused = downloadStates[id], let model = models.first(where: { $0.id == id }) {
+                startDownload(model)
+            }
         }
     }
 
@@ -379,7 +425,7 @@ struct StatusBadge: View {
         case .downloading: return settings.localized("downloading")
         case .paused: return settings.localized("paused")
         case .downloaded: return settings.localized("downloaded")
-        case .error(let msg): return "\(settings.localized("error")): \(msg)"
+        case .error: return settings.localized("error")
         }
     }
 
@@ -397,6 +443,7 @@ struct StatusBadge: View {
 // MARK: - ModelDownloadScreen
 struct ModelDownloadScreen: View {
     @EnvironmentObject var settings: AppSettings
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var vm = ModelDownloadViewModel()
     var onNavigateBack: () -> Void
 
@@ -471,6 +518,11 @@ struct ModelDownloadScreen: View {
         }
         .onAppear {
             vm.refreshStatuses()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                vm.resumeAutoResumableDownloads()
+            }
         }
     }
 }
