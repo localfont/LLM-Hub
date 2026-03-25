@@ -14,6 +14,7 @@ struct HomeScreen: View {
     var onNavigateToChat: () -> Void
     var onNavigateToModels: () -> Void
     var onNavigateToSettings: () -> Void
+    var onNavigateToRoute: (String) -> Void
     @State private var githubStars: Int? = nil
 
     var features: [FeatureCard] {
@@ -128,10 +129,14 @@ struct HomeScreen: View {
                     LazyVGrid(columns: columns, spacing: spacing) {
                         ForEach(features, id: \.route) { feature in
                             Button {
-                                if feature.route == "chat" {
+                                switch feature.route {
+                                case "chat":
                                     onNavigateToChat()
+                                case "writing_aid", "scam_detector", "vibe_coder":
+                                    onNavigateToRoute(feature.route)
+                                default:
+                                    break
                                 }
-                                // Other routes: coming soon
                             } label: {
                                 FeatureCardView(feature: feature)
                                     .frame(width: cardWidth, height: cardHeight)

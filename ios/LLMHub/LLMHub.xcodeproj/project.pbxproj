@@ -12,6 +12,7 @@
 		366119C26429D712F621B7DF /* ModelDownloadScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E674F93296C177D68CCEFED /* ModelDownloadScreen.swift */; };
 		3701462555C0F00B7A0F5B01 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54A0BA40DE3F5B7A1ED9A63 /* ChatScreen.swift */; };
 		3D9B9E094861BF2162D95F61 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 9307F4EE8A20C529993E87D1 /* RunAnywhere */; };
+		3DAB449A0AE3C67F8D2F39B1 /* FeatureScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */; };
 		467EEBBF61BCADC562B0C42C /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0805DB9589154E465145E2DB /* ChatModels.swift */; };
 		53F6C1EA0149E74AC5BB3E22 /* LLMBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD7AAE029AF6E8F7EA01B3D /* LLMBackend.swift */; };
 		59504FB10CC196F7E32BAB32 /* ModelData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C1A239A9E6DC307A0767C5 /* ModelData.swift */; };
@@ -41,6 +42,7 @@
 		5F60B98E5AE21634E4E47E99 /* LLMHub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LLMHub.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		60A19FA5E2C65DD1CDCAB9BB /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		65B931DD6FE1CD242E4A7907 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
+		70D3A8BE6F91CC4E2E5D0A11 /* zh */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = zh; path = zh.lproj/Localizable.strings; sourceTree = "<group>"; };
 		75BBFF4AA65F0EF6FF1DB93D /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
 		8576188C8596440A08A0B171 /* LLMHubApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHubApp.swift; sourceTree = "<group>"; };
 		8E674F93296C177D68CCEFED /* ModelDownloadScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadScreen.swift; sourceTree = "<group>"; };
@@ -50,6 +52,7 @@
 		A488607FEE31357AEB5904DB /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A587C281FC51DF179CF26022 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
 		A6D5DEA8384F9DDFC69C359C /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureScreens.swift; sourceTree = "<group>"; };
 		B1971F2045CA7CDE48259F47 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		C3C1A239A9E6DC307A0767C5 /* ModelData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelData.swift; sourceTree = "<group>"; };
 		C54A0BA40DE3F5B7A1ED9A63 /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
@@ -94,6 +97,7 @@
 				E06F261B9A91F8AA8BAA4778 /* ChatSettingsSheet.swift */,
 				C56D7A951BFDFE19E54CB73B /* ChatStore.swift */,
 				4F7A456876803C1FBBE0A211 /* ContentView.swift */,
+				B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */,
 				A6D5DEA8384F9DDFC69C359C /* HomeScreen.swift */,
 				F841EEA264BDE0E6E2A1BC18 /* Icon.png */,
 				ECD7AAE029AF6E8F7EA01B3D /* LLMBackend.swift */,
@@ -187,6 +191,7 @@
 				ru,
 				tr,
 				uk,
+				zh,
 			);
 			mainGroup = 60C52022B63693117913378C;
 			packageReferences = (
@@ -222,6 +227,7 @@
 				DF4968608455CAC5D2C20BE3 /* ChatSettingsSheet.swift in Sources */,
 				98A2325EC92DABBC3DFE2229 /* ChatStore.swift in Sources */,
 				CBC2016A51F62C4A68987D57 /* ContentView.swift in Sources */,
+				3DAB449A0AE3C67F8D2F39B1 /* FeatureScreens.swift in Sources */,
 				2A3672DC476297C35298841D /* HomeScreen.swift in Sources */,
 				53F6C1EA0149E74AC5BB3E22 /* LLMBackend.swift in Sources */,
 				BBEFB76ECA4FB739E947BF5D /* LLMHubApp.swift in Sources */,
@@ -256,6 +262,7 @@
 				A488607FEE31357AEB5904DB /* ru */,
 				52C0ECF6F3CAD2637A0AC803 /* tr */,
 				94722918DD9186F0D751D9C0 /* uk */,
+				70D3A8BE6F91CC4E2E5D0A11 /* zh */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
