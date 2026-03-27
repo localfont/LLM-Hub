@@ -474,22 +474,26 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../runanywhere-sdks-latest;
+/* Begin XCRemoteSwiftPackageReference section */
+		A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
+			requirement = {
+				kind = exactVersion;
+				version = 0.19.6;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		72F0EB7DB1F54E3913BC8763 /* RunAnywhereLlamaCPP */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */;
+			package = A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereLlamaCPP;
 		};
 		9307F4EE8A20C529993E87D1 /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */;
+			package = A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
 /* End XCSwiftPackageProductDependency section */

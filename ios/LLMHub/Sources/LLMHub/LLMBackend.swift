@@ -244,7 +244,7 @@ class LLMBackend: ObservableObject {
 
     private func registerModel(_ model: AIModel, contextLengthOverride: Int? = nil) {
         guard let primaryURL = URL(string: model.url) else { return }
-        let contextLength = contextLengthOverride ?? modelMaxContextWindow(for: model)
+        _ = contextLengthOverride
 
         if model.additionalFiles.isEmpty {
             RunAnywhere.registerModel(
@@ -254,7 +254,6 @@ class LLMBackend: ObservableObject {
                 framework: framework(for: model),
                 modality: model.supportsVision ? .multimodal : .language,
                 memoryRequirement: model.sizeBytes,
-                contextLength: contextLength,
                 supportsThinking: model.supportsThinking
             )
             return
@@ -270,8 +269,7 @@ class LLMBackend: ObservableObject {
             files: descriptors,
             framework: framework(for: model),
             modality: model.supportsVision ? .multimodal : .language,
-            memoryRequirement: model.sizeBytes,
-            contextLength: contextLength
+            memoryRequirement: model.sizeBytes
         )
     }
 
