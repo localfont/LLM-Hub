@@ -26,6 +26,8 @@ jobs:
         JAVA_TOOL_OPTIONS: "-Xmx3g -XX:MaxMetaspaceSize=512m"
       run: |
         chmod +x gradlew
+        printf 'org.gradle.jvmargs=-Xmx4096m\nandroid.useAndroidX=true\nandroid.enableJetifier=true\n' > gradle.properties
+        cat gradle.properties
         ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK
