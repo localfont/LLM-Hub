@@ -22,11 +22,11 @@ jobs:
 
     - name: Build with Gradle
       working-directory: ios/runanywhere-sdks-latest/Playground/android-use-agent
+      env:
+        JAVA_TOOL_OPTIONS: "-Xmx3g -XX:MaxMetaspaceSize=512m"
       run: |
         chmod +x gradlew
-        echo "android.useAndroidX=true" > gradle.properties
-        echo "android.enableJetifier=true" >> gradle.properties
-        ./gradlew assembleDebug
+        ./gradlew assembleDebug --no-daemon
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
