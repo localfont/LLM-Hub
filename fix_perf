@@ -1,0 +1,1 @@
+// The difference is that in `FeatureScreens.swift` the `Slider` is placed DIRECTLY in the view hierarchy, whereas in `ChatSettingsSheet`, we are using `configSlider` returning `some View`. Also we pass `$draftContextWindow` which triggers the whole `ChatSettingsSheet` to diff against `downloadedModels` computed property etc.

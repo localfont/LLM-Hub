@@ -7,7 +7,7 @@ options:
 packages:
   runanywhere-sdks:
     url: https://github.com/RunanywhereAI/runanywhere-sdks
-    exact: 0.19.7
+    exact: 0.19.6
 
 targets:
   LLMHub:

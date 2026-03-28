@@ -1,4 +1,3 @@
-//
 //  VLMTypes.swift
 //  RunAnywhere SDK
 //

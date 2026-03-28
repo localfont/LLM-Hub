@@ -8,7 +8,19 @@ struct ContentView: View {
             HomeScreen(
                 onNavigateToChat: { path.append(Screen.chat) },
                 onNavigateToModels: { path.append(Screen.models) },
-                onNavigateToSettings: { path.append(Screen.settings) }
+                onNavigateToSettings: { path.append(Screen.settings) },
+                onNavigateToRoute: { route in
+                    switch route {
+                    case "writing_aid":
+                        path.append(Screen.writingAid)
+                    case "scam_detector":
+                        path.append(Screen.scamDetector)
+                    case "vibe_coder":
+                        path.append(Screen.vibeCoder)
+                    default:
+                        break
+                    }
+                }
             )
             .navigationDestination(for: Screen.self) { screen in
                 switch screen {
@@ -28,6 +40,15 @@ struct ContentView: View {
                         onNavigateToModels: { path.append(Screen.models) }
                     )
                     .navigationBarBackButtonHidden(true)
+                case .writingAid:
+                    WritingAidScreen(onNavigateBack: { path.removeLast() })
+                        .navigationBarBackButtonHidden(true)
+                case .scamDetector:
+                    ScamDetectorScreen(onNavigateBack: { path.removeLast() })
+                        .navigationBarBackButtonHidden(true)
+                case .vibeCoder:
+                    VibeCoderScreen(onNavigateBack: { path.removeLast() })
+                        .navigationBarBackButtonHidden(true)
                 }
             }
         }
@@ -38,4 +59,7 @@ enum Screen: Hashable {
     case chat
     case models
     case settings
+    case writingAid
+    case scamDetector
+    case vibeCoder
 }

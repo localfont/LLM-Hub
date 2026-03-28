@@ -1,5 +1,5 @@
 {
-  "originHash" : "22182559e205015f320b82c344cd4537ab4ed307f580b605c32922edb566430c",
+  "originHash" : "df2c22e2bf1660344df01f01888e18403c2afd516088d5b4b0323762ac78ee1f",
   "pins" : [
     {
       "identity" : "alamofire",
@@ -44,6 +44,15 @@
       "state" : {
         "revision" : "5a170d29cf38e674b80541d7ce22929c6a11cdde",
         "version" : "1.1.1"
+      }
+    },
+    {
+      "identity" : "runanywhere-sdks",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RunanywhereAI/runanywhere-sdks",
+      "state" : {
+        "revision" : "70ca7c20cd7c0328056c6256609933661ae9b99a",
+        "version" : "0.19.6"
       }
     },
     {
@@ -105,8 +114,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/huggingface/swift-jinja.git",
       "state" : {
-        "revision" : "f731f03bf746481d4fda07f817c3774390c4d5b9",
-        "version" : "2.3.2"
+        "revision" : "2039e9760ba1694f9962ccd2c616403983d46895",
+        "version" : "2.3.3"
       }
     },
     {

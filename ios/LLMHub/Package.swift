@@ -16,7 +16,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(path: "../runanywhere-sdks-latest")
+        .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", exact: "0.19.6")
     ],
     targets: [
         .target(

@@ -12,6 +12,7 @@
 		366119C26429D712F621B7DF /* ModelDownloadScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E674F93296C177D68CCEFED /* ModelDownloadScreen.swift */; };
 		3701462555C0F00B7A0F5B01 /* ChatScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54A0BA40DE3F5B7A1ED9A63 /* ChatScreen.swift */; };
 		3D9B9E094861BF2162D95F61 /* RunAnywhere in Frameworks */ = {isa = PBXBuildFile; productRef = 9307F4EE8A20C529993E87D1 /* RunAnywhere */; };
+		3DAB449A0AE3C67F8D2F39B1 /* FeatureScreens.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */; };
 		467EEBBF61BCADC562B0C42C /* ChatModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0805DB9589154E465145E2DB /* ChatModels.swift */; };
 		53F6C1EA0149E74AC5BB3E22 /* LLMBackend.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECD7AAE029AF6E8F7EA01B3D /* LLMBackend.swift */; };
 		59504FB10CC196F7E32BAB32 /* ModelData.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3C1A239A9E6DC307A0767C5 /* ModelData.swift */; };
@@ -24,6 +25,7 @@
 		BBEFB76ECA4FB739E947BF5D /* LLMHubApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8576188C8596440A08A0B171 /* LLMHubApp.swift */; };
 		CB9C318430890100AF670AFF /* SettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = A587C281FC51DF179CF26022 /* SettingsScreen.swift */; };
 		CBC2016A51F62C4A68987D57 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F7A456876803C1FBBE0A211 /* ContentView.swift */; };
+		1F3A9E5C7B2E4D6F8A1B2C3D /* ApolloTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E4B5F6A7C8D9E0F1A2B3C4D /* ApolloTheme.swift */; };
 		DF4968608455CAC5D2C20BE3 /* ChatSettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E06F261B9A91F8AA8BAA4778 /* ChatSettingsSheet.swift */; };
 		E534E3B14352A9FCAA9F1A89 /* RunAnywhereLlamaCPP in Frameworks */ = {isa = PBXBuildFile; productRef = 72F0EB7DB1F54E3913BC8763 /* RunAnywhereLlamaCPP */; };
 /* End PBXBuildFile section */
@@ -33,6 +35,7 @@
 		0805DB9589154E465145E2DB /* ChatModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatModels.swift; sourceTree = "<group>"; };
 		223C0ACCB98929BFEDBB0B16 /* it */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = it; path = it.lproj/Localizable.strings; sourceTree = "<group>"; };
 		2FDAEABFBFE266EFF8492FEB /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		2E4B5F6A7C8D9E0F1A2B3C4D /* ApolloTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApolloTheme.swift; sourceTree = "<group>"; };
 		42AB4DF1F6862EBAD2981FB1 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		4F7A456876803C1FBBE0A211 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		4F8A6C472246E921AAAC7A1B /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
@@ -41,6 +44,7 @@
 		5F60B98E5AE21634E4E47E99 /* LLMHub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LLMHub.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		60A19FA5E2C65DD1CDCAB9BB /* Accelerate.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Accelerate.framework; path = System/Library/Frameworks/Accelerate.framework; sourceTree = SDKROOT; };
 		65B931DD6FE1CD242E4A7907 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
+		70D3A8BE6F91CC4E2E5D0A11 /* zh */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = zh; path = zh.lproj/Localizable.strings; sourceTree = "<group>"; };
 		75BBFF4AA65F0EF6FF1DB93D /* LocalizationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationManager.swift; sourceTree = "<group>"; };
 		8576188C8596440A08A0B171 /* LLMHubApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMHubApp.swift; sourceTree = "<group>"; };
 		8E674F93296C177D68CCEFED /* ModelDownloadScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelDownloadScreen.swift; sourceTree = "<group>"; };
@@ -50,6 +54,7 @@
 		A488607FEE31357AEB5904DB /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		A587C281FC51DF179CF26022 /* SettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsScreen.swift; sourceTree = "<group>"; };
 		A6D5DEA8384F9DDFC69C359C /* HomeScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeScreen.swift; sourceTree = "<group>"; };
+		B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureScreens.swift; sourceTree = "<group>"; };
 		B1971F2045CA7CDE48259F47 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		C3C1A239A9E6DC307A0767C5 /* ModelData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelData.swift; sourceTree = "<group>"; };
 		C54A0BA40DE3F5B7A1ED9A63 /* ChatScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatScreen.swift; sourceTree = "<group>"; };
@@ -89,11 +94,13 @@
 		44F5735070D2A88436068B98 /* LLMHub */ = {
 			isa = PBXGroup;
 			children = (
+				2E4B5F6A7C8D9E0F1A2B3C4D /* ApolloTheme.swift */,
 				0805DB9589154E465145E2DB /* ChatModels.swift */,
 				C54A0BA40DE3F5B7A1ED9A63 /* ChatScreen.swift */,
 				E06F261B9A91F8AA8BAA4778 /* ChatSettingsSheet.swift */,
 				C56D7A951BFDFE19E54CB73B /* ChatStore.swift */,
 				4F7A456876803C1FBBE0A211 /* ContentView.swift */,
+				B2A92FE9D6B44A3156E987C2 /* FeatureScreens.swift */,
 				A6D5DEA8384F9DDFC69C359C /* HomeScreen.swift */,
 				F841EEA264BDE0E6E2A1BC18 /* Icon.png */,
 				ECD7AAE029AF6E8F7EA01B3D /* LLMBackend.swift */,
@@ -187,6 +194,7 @@
 				ru,
 				tr,
 				uk,
+				zh,
 			);
 			mainGroup = 60C52022B63693117913378C;
 			packageReferences = (
@@ -217,11 +225,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1F3A9E5C7B2E4D6F8A1B2C3D /* ApolloTheme.swift in Sources */,
 				467EEBBF61BCADC562B0C42C /* ChatModels.swift in Sources */,
 				3701462555C0F00B7A0F5B01 /* ChatScreen.swift in Sources */,
 				DF4968608455CAC5D2C20BE3 /* ChatSettingsSheet.swift in Sources */,
 				98A2325EC92DABBC3DFE2229 /* ChatStore.swift in Sources */,
 				CBC2016A51F62C4A68987D57 /* ContentView.swift in Sources */,
+				3DAB449A0AE3C67F8D2F39B1 /* FeatureScreens.swift in Sources */,
 				2A3672DC476297C35298841D /* HomeScreen.swift in Sources */,
 				53F6C1EA0149E74AC5BB3E22 /* LLMBackend.swift in Sources */,
 				BBEFB76ECA4FB739E947BF5D /* LLMHubApp.swift in Sources */,
@@ -256,6 +266,7 @@
 				A488607FEE31357AEB5904DB /* ru */,
 				52C0ECF6F3CAD2637A0AC803 /* tr */,
 				94722918DD9186F0D751D9C0 /* uk */,
+				70D3A8BE6F91CC4E2E5D0A11 /* zh */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -463,22 +474,26 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../runanywhere-sdks-latest;
+/* Begin XCRemoteSwiftPackageReference section */
+		A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RunanywhereAI/runanywhere-sdks";
+			requirement = {
+				kind = exactVersion;
+				version = 0.19.6;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		72F0EB7DB1F54E3913BC8763 /* RunAnywhereLlamaCPP */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */;
+			package = A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhereLlamaCPP;
 		};
 		9307F4EE8A20C529993E87D1 /* RunAnywhere */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = A26F31FFA020DC1866683F48 /* XCLocalSwiftPackageReference "runanywhere-sdks-latest" */;
+			package = A26F31FFA020DC1866683F48 /* XCRemoteSwiftPackageReference "runanywhere-sdks" */;
 			productName = RunAnywhere;
 		};
 /* End XCSwiftPackageProductDependency section */

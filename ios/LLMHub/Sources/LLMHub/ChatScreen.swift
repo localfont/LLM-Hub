@@ -7,29 +7,147 @@ import UniformTypeIdentifiers
 import ImageIO
 #endif
 
+private func persistentAttachmentDirectoryURL() -> URL {
+    let fileManager = FileManager.default
+    let base = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+        ?? fileManager.urls(for: .documentDirectory, in: .userDomainMask).first
+        ?? fileManager.temporaryDirectory
+    let dir = base.appendingPathComponent("LLMHubAttachments", isDirectory: true)
+    try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+private func resolveStoredAttachmentURL(_ storedPath: String?) -> URL? {
+    guard var raw = storedPath?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else {
+        return nil
+    }
+
+    if raw.hasPrefix("Optional(\"") && raw.hasSuffix("\")") {
+        raw = String(raw.dropFirst("Optional(\"".count).dropLast(2))
+    }
+
+    let fm = FileManager.default
+    var candidates: [URL] = []
+
+    if let url = URL(string: raw), url.isFileURL {
+        candidates.append(url)
+    }
+
+    candidates.append(URL(fileURLWithPath: raw))
+
+    for candidate in candidates where fm.fileExists(atPath: candidate.path) {
+        return candidate
+    }
+
+    let fallbackName = (candidates.last ?? URL(fileURLWithPath: raw)).lastPathComponent
+    guard !fallbackName.isEmpty else { return nil }
+
+    let fallbackDirs = [
+        persistentAttachmentDirectoryURL(),
+        fm.temporaryDirectory.appendingPathComponent("llmhub_attachments", isDirectory: true),
+    ]
+
+    for dir in fallbackDirs {
+        let candidate = dir.appendingPathComponent(fallbackName)
+        if fm.fileExists(atPath: candidate.path) {
+            return candidate
+        }
+    }
+
+    return nil
+}
+
 // MARK: - Chat ViewModel
 @MainActor
 class ChatViewModel: ObservableObject {
+    private struct ModelGenerationSettings: Codable {
+        var maxTokens: Double
+        var contextWindow: Double
+        var topK: Double
+        var topP: Double
+        var temperature: Double
+        var selectedBackend: String
+        var enableVision: Bool
+        var enableAudio: Bool
+        var enableThinking: Bool
+    }
+
+    private enum PersistenceKeys {
+        static let selectedModelName = "chat_selected_model_name"
+        static let perModelSettings = "chat_model_generation_settings_v1"
+
+        // Legacy global settings keys for migration defaults.
+        static let maxTokens = "chat_max_tokens"
+        static let contextWindow = "chat_context_window"
+        static let topK = "chat_top_k"
+        static let topP = "chat_top_p"
+        static let temperature = "chat_temperature"
+        static let selectedBackend = "chat_selected_backend"
+        static let enableVision = "chat_enable_vision"
+        static let enableAudio = "chat_enable_audio"
+        static let enableThinking = "chat_enable_thinking"
+    }
+
+    private static let defaultGenerationSettings = ModelGenerationSettings(
+        maxTokens: 512,
+        contextWindow: 2048,
+        topK: 64,
+        topP: 0.95,
+        temperature: 1.0,
+        selectedBackend: "GPU",
+        enableVision: true,
+        enableAudio: true,
+        enableThinking: true
+    )
+
     @Published var inputText: String = ""
     @Published var isGenerating: Bool = false
     @Published var tokensPerSecond: Double = 0
     @Published var totalTokens: Int = 0
-    @Published var selectedModelName: String = AppSettings.shared.localized("no_model_selected")
+    @Published var selectedModelName: String = AppSettings.shared.localized("no_model_selected") {
+        didSet {
+            guard selectedModelName != oldValue else { return }
+            userDefaults.set(selectedModelName, forKey: PersistenceKeys.selectedModelName)
+            loadSettingsForSelectedModel()
+        }
+    }
     @Published var isBackendLoading: Bool = false
     
-    // Config Properties (Persisted)
-    @AppStorage("chat_max_tokens") var maxTokens: Double = 512
-    @AppStorage("chat_context_window") var contextWindow: Double = 2048
-    @AppStorage("chat_top_k") var topK: Double = 64
-    @AppStorage("chat_top_p") var topP: Double = 0.95
-    @AppStorage("chat_temperature") var temperature: Double = 1.0
-    @AppStorage("chat_selected_backend") var selectedBackend: String = "GPU"
-    @AppStorage("chat_enable_vision") var enableVision: Bool = true
-    @AppStorage("chat_enable_audio") var enableAudio: Bool = true
-    @AppStorage("chat_enable_thinking") var enableThinking: Bool = true
+    // Config Properties (Persisted per model)
+    @Published var maxTokens: Double = ChatViewModel.defaultGenerationSettings.maxTokens {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var contextWindow: Double = ChatViewModel.defaultGenerationSettings.contextWindow {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var topK: Double = ChatViewModel.defaultGenerationSettings.topK {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var topP: Double = ChatViewModel.defaultGenerationSettings.topP {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var temperature: Double = ChatViewModel.defaultGenerationSettings.temperature {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var selectedBackend: String = ChatViewModel.defaultGenerationSettings.selectedBackend {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var enableVision: Bool = ChatViewModel.defaultGenerationSettings.enableVision {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var enableAudio: Bool = ChatViewModel.defaultGenerationSettings.enableAudio {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
+    @Published var enableThinking: Bool = ChatViewModel.defaultGenerationSettings.enableThinking {
+        didSet { persistCurrentModelSettingsIfNeeded() }
+    }
 
     private let chatStore = ChatStore.shared
     private let llmBackend = LLMBackend.shared
+    private let userDefaults = UserDefaults.standard
+    private var settingsByModelId: [String: ModelGenerationSettings] = [:]
+    private var contextResetStartBySessionId: [UUID: Int] = [:]
+    private var isApplyingPersistedSettings = false
     @Published var currentSessionId: UUID = UUID()
     private var activeGeneratingMessageId: UUID?
     
@@ -52,6 +170,50 @@ class ChatViewModel: ObservableObject {
 
     var latestAssistantMessageId: UUID? {
         messages.last(where: { !$0.isFromUser && !$0.isGenerating && !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })?.id
+    }
+
+    var contextWindowCapForSession: Double {
+        let selectedModelCap = Double(max(1, ModelData.models.first(where: { $0.name == selectedModelName })?.contextWindowSize ?? 0))
+        let loadedCap = Double(max(1, llmBackend.loadedContextWindow ?? 0))
+        let configuredCap = Double(max(1, Int(contextWindow)))
+        return max(selectedModelCap, loadedCap, configuredCap, 1)
+    }
+
+    var contextBudgetForRing: Double {
+        let generationBudget = Double(max(1, Int(maxTokens)))
+        return min(contextWindowCapForSession, generationBudget)
+    }
+
+    var approximateContextTokensUsed: Double {
+        let startIndex = max(0, min(messages.count, contextResetStartBySessionId[currentSessionId] ?? 0))
+        let visibleMessages = Array(messages.dropFirst(startIndex))
+        let messageChars = visibleMessages.reduce(0) { $0 + $1.content.count }
+        let composerChars = inputText.count
+        let totalChars = messageChars + composerChars
+        return max(0, Double(totalChars) / 4.0)
+    }
+
+    var contextUsageFractionRaw: Double {
+        guard contextBudgetForRing > 0 else { return 0 }
+        return min(max(approximateContextTokensUsed / contextBudgetForRing, 0), 1)
+    }
+
+    var contextUsageFractionDisplay: Double {
+        if approximateContextTokensUsed <= 0 {
+            return 0
+        }
+        return min(max(contextUsageFractionRaw, 0.02), 1)
+    }
+
+    var contextUsageLabel: String {
+        if approximateContextTokensUsed > 0 {
+            return "\(max(1, Int((contextUsageFractionRaw * 100).rounded())))%"
+        }
+        return "0%"
+    }
+
+    var isContextBudgetExceededForSession: Bool {
+        contextUsageFractionRaw >= 0.995
     }
     
     var messages: [ChatMessage] {
@@ -77,6 +239,15 @@ class ChatViewModel: ObservableObject {
         Task {
             _ = await RunAnywhere.discoverDownloadedModels()
         }
+
+        settingsByModelId = Self.loadPerModelSettings(from: userDefaults)
+
+        if let savedModelName = userDefaults.string(forKey: PersistenceKeys.selectedModelName),
+           !savedModelName.isEmpty {
+            selectedModelName = savedModelName
+        }
+
+        loadSettingsForSelectedModel()
 
         if let empty = chatStore.chatSessions.first(where: { $0.messages.isEmpty }) {
             currentSessionId = empty.id
@@ -124,6 +295,139 @@ class ChatViewModel: ObservableObject {
         llmBackend.selectedBackend = selectedBackend
     }
 
+    private var selectedModelId: String? {
+        guard selectedModelName != AppSettings.shared.localized("no_model_selected") else { return nil }
+        return ModelData.models.first(where: { $0.name == selectedModelName })?.id
+    }
+
+    private func loadSettingsForSelectedModel() {
+        let settings: ModelGenerationSettings
+
+        if let modelId = selectedModelId,
+           let persisted = settingsByModelId[modelId] {
+            settings = clampSettings(persisted, forModelName: selectedModelName)
+        } else {
+            settings = clampSettings(Self.legacyDefaults(from: userDefaults), forModelName: selectedModelName)
+        }
+
+        applySettings(settings)
+
+        // Ensure first-time model selections get persisted immediately.
+        persistCurrentModelSettingsIfNeeded(force: true)
+    }
+
+    private func applySettings(_ settings: ModelGenerationSettings) {
+        isApplyingPersistedSettings = true
+        maxTokens = settings.maxTokens
+        contextWindow = settings.contextWindow
+        topK = settings.topK
+        topP = settings.topP
+        temperature = settings.temperature
+        selectedBackend = settings.selectedBackend
+        enableVision = settings.enableVision
+        enableAudio = settings.enableAudio
+        enableThinking = settings.enableThinking
+        isApplyingPersistedSettings = false
+    }
+
+    private func currentSettingsSnapshot() -> ModelGenerationSettings {
+        ModelGenerationSettings(
+            maxTokens: maxTokens,
+            contextWindow: contextWindow,
+            topK: topK,
+            topP: topP,
+            temperature: temperature,
+            selectedBackend: selectedBackend,
+            enableVision: enableVision,
+            enableAudio: enableAudio,
+            enableThinking: enableThinking
+        )
+    }
+
+    private func persistCurrentModelSettingsIfNeeded(force: Bool = false) {
+        if isApplyingPersistedSettings && !force { return }
+        guard let modelId = selectedModelId else { return }
+
+        let normalized = clampSettings(currentSettingsSnapshot(), forModelName: selectedModelName)
+        settingsByModelId[modelId] = normalized
+
+        if !isApplyingPersistedSettings {
+            applySettings(normalized)
+        }
+
+        Self.savePerModelSettings(settingsByModelId, to: userDefaults)
+    }
+
+    private func clampSettings(_ settings: ModelGenerationSettings, forModelName modelName: String) -> ModelGenerationSettings {
+        guard let model = ModelData.models.first(where: { $0.name == modelName }) else {
+            var fallback = settings
+            fallback.contextWindow = max(1, fallback.contextWindow)
+            fallback.maxTokens = min(max(1, fallback.maxTokens), fallback.contextWindow)
+            fallback.topK = min(max(1, fallback.topK), 256)
+            fallback.topP = min(max(0, fallback.topP), 1)
+            fallback.temperature = min(max(0, fallback.temperature), 2)
+            return fallback
+        }
+
+        let modelMaxContext = Double(max(1, model.contextWindowSize > 0 ? model.contextWindowSize : 2048))
+        var clamped = settings
+        clamped.contextWindow = min(max(1, clamped.contextWindow), modelMaxContext)
+        clamped.maxTokens = min(max(1, clamped.maxTokens), clamped.contextWindow)
+        clamped.topK = min(max(1, clamped.topK), 256)
+        clamped.topP = min(max(0, clamped.topP), 1)
+        clamped.temperature = min(max(0, clamped.temperature), 2)
+        return clamped
+    }
+
+    private static func loadPerModelSettings(from defaults: UserDefaults) -> [String: ModelGenerationSettings] {
+        guard let data = defaults.data(forKey: PersistenceKeys.perModelSettings) else {
+            return [:]
+        }
+        guard let decoded = try? JSONDecoder().decode([String: ModelGenerationSettings].self, from: data) else {
+            return [:]
+        }
+        return decoded
+    }
+
+    private static func savePerModelSettings(_ settingsByModelId: [String: ModelGenerationSettings], to defaults: UserDefaults) {
+        guard let data = try? JSONEncoder().encode(settingsByModelId) else { return }
+        defaults.set(data, forKey: PersistenceKeys.perModelSettings)
+    }
+
+    private static func legacyDefaults(from defaults: UserDefaults) -> ModelGenerationSettings {
+        var settings = defaultGenerationSettings
+
+        if defaults.object(forKey: PersistenceKeys.maxTokens) != nil {
+            settings.maxTokens = defaults.double(forKey: PersistenceKeys.maxTokens)
+        }
+        if defaults.object(forKey: PersistenceKeys.contextWindow) != nil {
+            settings.contextWindow = defaults.double(forKey: PersistenceKeys.contextWindow)
+        }
+        if defaults.object(forKey: PersistenceKeys.topK) != nil {
+            settings.topK = defaults.double(forKey: PersistenceKeys.topK)
+        }
+        if defaults.object(forKey: PersistenceKeys.topP) != nil {
+            settings.topP = defaults.double(forKey: PersistenceKeys.topP)
+        }
+        if defaults.object(forKey: PersistenceKeys.temperature) != nil {
+            settings.temperature = defaults.double(forKey: PersistenceKeys.temperature)
+        }
+        if let backend = defaults.string(forKey: PersistenceKeys.selectedBackend), !backend.isEmpty {
+            settings.selectedBackend = backend
+        }
+        if defaults.object(forKey: PersistenceKeys.enableVision) != nil {
+            settings.enableVision = defaults.bool(forKey: PersistenceKeys.enableVision)
+        }
+        if defaults.object(forKey: PersistenceKeys.enableAudio) != nil {
+            settings.enableAudio = defaults.bool(forKey: PersistenceKeys.enableAudio)
+        }
+        if defaults.object(forKey: PersistenceKeys.enableThinking) != nil {
+            settings.enableThinking = defaults.bool(forKey: PersistenceKeys.enableThinking)
+        }
+
+        return settings
+    }
+
     func unloadModel() {
         llmBackend.isLoaded = false
         llmBackend.currentlyLoadedModel = nil
@@ -147,6 +451,16 @@ class ChatViewModel: ObservableObject {
             return ""
         }()
 
+        let projectedChars = messages.reduce(0) { $0 + $1.content.count } + generationPrompt.count
+        let projectedTokens = Double(projectedChars) / 4.0
+        let projectedFraction = contextBudgetForRing > 0 ? (projectedTokens / contextBudgetForRing) : 0
+        let shouldResetInferenceContext = (isContextBudgetExceededForSession || projectedFraction >= 0.995) && !messages.isEmpty
+
+        if shouldResetInferenceContext {
+            // Keep existing transcript visible, but reset token accounting from this point forward.
+            contextResetStartBySessionId[currentSessionId] = messages.count
+        }
+
         let userMsg = ChatMessage(
             content: input,
             isFromUser: true,
@@ -168,7 +482,7 @@ class ChatViewModel: ObservableObject {
         isGenerating = true
 
         streamingTask = Task {
-            await loadModelIfNecessary()
+            await loadModelIfNecessary(force: shouldResetInferenceContext)
             
             do {
                 if !llmBackend.isLoaded {
@@ -215,7 +529,7 @@ class ChatViewModel: ObservableObject {
 
         if let idx = targetIndex, !messages[idx].isFromUser {
             var msgs = self.messages
-            msgs[idx].content = content
+            msgs[idx].content = normalizeStreamText(content)
             msgs[idx].isGenerating = isGenerating
             self.totalTokens = tokens
             self.tokensPerSecond = tps
@@ -223,6 +537,17 @@ class ChatViewModel: ObservableObject {
             msgs[idx].tokensPerSecond = tps > 0 ? tps : msgs[idx].tokensPerSecond
             self.messages = msgs
         }
+    }
+
+    private func normalizeStreamText(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "â€™", with: "'")
+            .replacingOccurrences(of: "â€˜", with: "'")
+            .replacingOccurrences(of: "â€œ", with: "\"")
+            .replacingOccurrences(of: "â€", with: "\"")
+            .replacingOccurrences(of: "â€“", with: "-")
+            .replacingOccurrences(of: "â€”", with: "-")
+            .replacingOccurrences(of: "�", with: "'")
     }
 
     private func finishGeneratingMessage() {
@@ -267,11 +592,13 @@ class ChatViewModel: ObservableObject {
         let session = ChatSession(title: AppSettings.shared.localized("drawer_new_chat"))
         chatStore.addSession(session)
         currentSessionId = session.id
+        contextResetStartBySessionId[session.id] = 0
         objectWillChange.send()
     }
 
     func deleteSession(_ id: UUID) {
         chatStore.deleteSession(id: id)
+        contextResetStartBySessionId.removeValue(forKey: id)
         if currentSessionId == id {
             if let first = chatSessions.first {
                 currentSessionId = first.id
@@ -373,9 +700,7 @@ class ChatViewModel: ObservableObject {
     private var streamingTask: Task<Void, Never>?
 
     private func existingFileURL(atPath path: String?) -> URL? {
-        guard let path,
-              FileManager.default.fileExists(atPath: path) else { return nil }
-        return URL(fileURLWithPath: path)
+        resolveStoredAttachmentURL(path)
     }
 }
 
@@ -384,6 +709,7 @@ struct MessageBubble: View {
     @EnvironmentObject var settings: AppSettings
     let message: ChatMessage
     let onCopy: () -> Void
+    let onOpenImage: ((String) -> Void)?
     let onEditUserMessage: ((String) -> Void)?
     let onEditAssistantMessage: ((String) -> Void)?
     let onRegenerateResponse: (() -> Void)?
@@ -401,8 +727,12 @@ struct MessageBubble: View {
                             TextEditor(text: $editedText)
                                 .frame(minHeight: 90)
                                 .padding(8)
-                                .background(Color(.secondarySystemBackground))
+                                .background(.ultraThinMaterial)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                                )
                             HStack(spacing: 8) {
                                 Button {
                                     isEditing = false
@@ -423,7 +753,7 @@ struct MessageBubble: View {
                                 .disabled(editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.68))
                         }
                         .frame(maxWidth: 320)
                     } else {
@@ -435,6 +765,9 @@ struct MessageBubble: View {
                                     .scaledToFit()
                                     .frame(maxWidth: 220)
                                     .clipShape(RoundedRectangle(cornerRadius: 14))
+                                    .onTapGesture {
+                                        onOpenImage?(imagePath)
+                                    }
                             }
 
                             if message.attachmentAudioPath != nil {
@@ -445,7 +778,7 @@ struct MessageBubble: View {
                                     .padding(.vertical, 8)
                                     .background(
                                         RoundedRectangle(cornerRadius: 14)
-                                            .fill(LinearGradient(colors: [Color.indigo.opacity(0.85), Color.purple.opacity(0.85)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            .fill(LinearGradient(colors: [Color(hex: "5e7bb2").opacity(0.92), Color(hex: "455a7d").opacity(0.94)], startPoint: .topLeading, endPoint: .bottomTrailing))
                                     )
                             }
 
@@ -457,7 +790,11 @@ struct MessageBubble: View {
                                     .padding(.vertical, 10)
                                     .background(
                                         RoundedRectangle(cornerRadius: 18)
-                                            .fill(LinearGradient(colors: [Color.indigo, Color.purple], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                            .fill(LinearGradient(colors: [Color(hex: "6f93cd"), Color(hex: "455c82")], startPoint: .topLeading, endPoint: .bottomTrailing))
+                                    )
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 18)
+                                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
                                     )
                             }
                         }
@@ -476,8 +813,12 @@ struct MessageBubble: View {
                             TextEditor(text: $editedText)
                                 .frame(minHeight: 100)
                                 .padding(8)
-                                .background(Color(.secondarySystemBackground))
+                                .background(.ultraThinMaterial)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                                )
                             HStack(spacing: 10) {
                                 Button {
                                     isEditing = false
@@ -498,11 +839,12 @@ struct MessageBubble: View {
                                 .disabled(editedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                             }
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.68))
                         }
                     } else {
                         RenderMessageSegments(displayContent: message.content)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 4)
                             .onLongPressGesture {
                                 showActions = true
                             }
@@ -524,7 +866,7 @@ struct MessageBubble: View {
                         Image(systemName: "doc.on.doc")
                     }
                     .buttonStyle(.plain)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.68))
 
                     if message.isFromUser,
                        !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -536,7 +878,7 @@ struct MessageBubble: View {
                             Image(systemName: "pencil")
                         }
                         .buttonStyle(.plain)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.68))
                     }
 
                     if !message.isFromUser, let onEditAssistantMessage {
@@ -547,7 +889,7 @@ struct MessageBubble: View {
                             Image(systemName: "pencil")
                         }
                         .buttonStyle(.plain)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.68))
                     }
 
                     if !message.isFromUser, let onRegenerateResponse {
@@ -555,7 +897,7 @@ struct MessageBubble: View {
                             Image(systemName: "arrow.clockwise")
                         }
                         .buttonStyle(.plain)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.68))
                     }
 
                     if !message.isFromUser,
@@ -565,14 +907,14 @@ struct MessageBubble: View {
                         Spacer()
                         Label(String(format: settings.localized("tokens_per_second_format"), tokenCount, tps), systemImage: "bolt.fill")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.63))
                     }
                 }
             }
 
             Text(message.timestamp, style: .time)
                 .font(.caption2)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.5))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .confirmationDialog(settings.localized("more_options"), isPresented: $showActions) {
@@ -584,11 +926,12 @@ struct MessageBubble: View {
     }
 
     private func previewImage(from path: String) -> UIImage? {
+        guard let resolvedURL = resolveStoredAttachmentURL(path) else { return nil }
+
         #if canImport(ImageIO)
-        let url = URL(fileURLWithPath: path)
         let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions) else {
-            return UIImage(contentsOfFile: path)
+        guard let source = CGImageSourceCreateWithURL(resolvedURL as CFURL, sourceOptions) else {
+            return UIImage(contentsOfFile: resolvedURL.path)
         }
 
         let thumbOptions = [
@@ -602,7 +945,7 @@ struct MessageBubble: View {
             return UIImage(cgImage: cgImage)
         }
         #endif
-        return UIImage(contentsOfFile: path)
+        return UIImage(contentsOfFile: resolvedURL.path)
     }
 }
 
@@ -614,7 +957,7 @@ struct TypingIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<3) { i in
                 Circle()
-                    .fill(Color.secondary)
+                    .fill(Color.white.opacity(0.68))
                     .frame(width: 6, height: 6)
                     .scaleEffect(1.0 + 0.4 * sin(phase + Double(i) * .pi / 1.5))
             }
@@ -648,16 +991,17 @@ private struct RenderMessageSegments: View {
                         if let language, !language.isEmpty {
                             Text(language)
                                 .font(.caption2.weight(.semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.65))
                         }
                         ScrollView(.horizontal, showsIndicators: false) {
                             Text(content.trimmingCharacters(in: .newlines))
                                 .font(.system(.body, design: .monospaced))
+                                .foregroundColor(.white.opacity(0.92))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(10)
-                    .background(Color.secondary.opacity(0.12))
+                    .background(Color.white.opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
             }
@@ -755,12 +1099,14 @@ private struct MarkdownMessageText: View {
                     Text(attributed)
                         .font(.body)
                         .lineSpacing(4)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 } else {
                     Text(line)
                         .font(.body)
                         .lineSpacing(4)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                 }
@@ -859,8 +1205,11 @@ struct ChatDrawerPanel: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(ApolloLiquidBackground())
             .navigationTitle(settings.localized("drawer_title"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     // Back arrow to Home - same as Android drawer's ArrowBack
@@ -905,34 +1254,56 @@ struct ChatScreen: View {
     @State private var selectedImageItem: PhotosPickerItem?
     @State private var attachedImageURL: URL?
     @State private var attachedAudioURL: URL?
+    @State private var previewImagePath: String?
     @State private var showAudioImporter = false
     @FocusState private var isComposerFocused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
-            if !vm.messages.isEmpty {
-                HStack(spacing: 12) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(vm.selectedModelName)
-                                .font(.caption.bold())
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(vm.isBackendLoading ? .orange.opacity(0.2) : .indigo.opacity(0.1))
-                        .foregroundColor(vm.isBackendLoading ? .orange : .indigo)
-                        .clipShape(Capsule())
+            HStack(spacing: 12) {
+                Button {
+                    showSettings = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(vm.selectedModelName)
+                            .font(.caption.bold())
+                            .foregroundColor(.white)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .bold))
+                            .foregroundColor(.white.opacity(0.78))
                     }
-                    Spacer()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(vm.isBackendLoading ? Color.orange.opacity(0.26) : Color.white.opacity(0.12))
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                    )
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(.thinMaterial)
+
+                Spacer()
+
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.18), lineWidth: 2)
+                    Circle()
+                        .trim(from: 0, to: vm.contextUsageFractionDisplay)
+                        .stroke(
+                            vm.contextUsageFractionRaw < 0.90 ? Color.cyan : Color.orange,
+                            style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+
+                    Text(vm.contextUsageFractionRaw < 0.995 ? vm.contextUsageLabel : "!")
+                        .font(.system(size: 8, weight: .bold, design: .rounded))
+                }
+                .frame(width: 28, height: 28)
+                .accessibilityLabel("Context usage \(vm.contextUsageLabel)")
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
 
             ScrollViewReader { proxy in
                 ScrollView {
@@ -956,6 +1327,9 @@ struct ChatScreen: View {
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                                             copiedMessageId = nil
                                         }
+                                    },
+                                    onOpenImage: { imagePath in
+                                        previewImagePath = imagePath
                                     },
                                     onEditUserMessage: { updatedPrompt in
                                         if canEditUser {
@@ -994,9 +1368,7 @@ struct ChatScreen: View {
                 }
                 .onChange(of: vm.messages.last?.content ?? "") { _, _ in
                     if vm.isGenerating, let last = vm.messages.last {
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo(last.id, anchor: .bottom)
-                        }
+                        proxy.scrollTo(last.id, anchor: .bottom)
                     }
                 }
                 .onChange(of: isComposerFocused) { _, focused in
@@ -1011,6 +1383,7 @@ struct ChatScreen: View {
             if let _ = copiedMessageId {
                 Text(settings.localized("message_copied"))
                     .font(.caption)
+                    .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial)
@@ -1039,7 +1412,7 @@ struct ChatScreen: View {
                 .padding(.top, 6)
             }
 
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 let selectedModel = ModelData.models.first(where: { $0.name == vm.selectedModelName })
                 let canAttachVision = (selectedModel?.supportsVision == true) && vm.enableVision
                 let canAttachAudio = (selectedModel?.supportsAudio == true) && vm.enableAudio
@@ -1048,7 +1421,10 @@ struct ChatScreen: View {
                     PhotosPicker(selection: $selectedImageItem, matching: .images) {
                         Image(systemName: "photo")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.indigo)
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(8)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
                     }
                     .disabled(vm.isGenerating)
                 }
@@ -1059,55 +1435,67 @@ struct ChatScreen: View {
                     } label: {
                         Image(systemName: "waveform")
                             .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.indigo)
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(8)
+                            .background(Color.white.opacity(0.1))
+                            .clipShape(Circle())
                     }
                     .disabled(vm.isGenerating)
                 }
 
-                TextField(settings.localized("type_a_message"), text: $vm.inputText, axis: .vertical)
-                    .lineLimit(1...5)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 22))
-                    .focused($isComposerFocused)
-                    .onSubmit {
-                        if vm.sendMessage(imageURL: attachedImageURL, audioURL: attachedAudioURL) {
-                            attachedImageURL = nil
-                            attachedAudioURL = nil
-                            selectedImageItem = nil
+                HStack(spacing: 8) {
+                    TextField(settings.localized("type_a_message"), text: $vm.inputText, axis: .vertical)
+                        .lineLimit(1...5)
+                        .padding(.leading, 18)
+                        .padding(.vertical, 14)
+                        .focused($isComposerFocused)
+                        .foregroundColor(.white)
+                        .onSubmit {
+                            if vm.sendMessage(imageURL: attachedImageURL, audioURL: attachedAudioURL) {
+                                attachedImageURL = nil
+                                attachedAudioURL = nil
+                                selectedImageItem = nil
+                            }
                         }
-                    }
 
-                Button {
-                    isComposerFocused = false
-                    if vm.isGenerating {
-                        vm.stopGeneration()
-                    } else {
-                        if vm.sendMessage(imageURL: attachedImageURL, audioURL: attachedAudioURL) {
-                            attachedImageURL = nil
-                            attachedAudioURL = nil
-                            selectedImageItem = nil
+                    Button {
+                        isComposerFocused = false
+                        if vm.isGenerating {
+                            vm.stopGeneration()
+                        } else {
+                            if vm.sendMessage(imageURL: attachedImageURL, audioURL: attachedAudioURL) {
+                                attachedImageURL = nil
+                                attachedAudioURL = nil
+                                selectedImageItem = nil
+                            }
                         }
+                    } label: {
+                        Image(systemName: vm.isGenerating ? "stop.fill" : "arrow.up")
+                            .font(.system(size: 16, weight: .bold))
+                            .foregroundColor(vm.isGenerating ? .white : .black)
+                            .frame(width: 32, height: 32)
+                            .background(vm.isGenerating ? Color.red.opacity(0.8) : Color.white)
+                            .clipShape(Circle())
                     }
-                } label: {
-                    Image(systemName: vm.isGenerating ? "stop.circle.fill" : "arrow.up.circle.fill")
-                        .font(.system(size: 34))
-                        .foregroundStyle(vm.isGenerating ? .red : .indigo)
+                    .padding(.trailing, 8)
+                    .disabled(
+                        !vm.isGenerating
+                            && vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            && attachedImageURL == nil
+                            && attachedAudioURL == nil
+                    )
                 }
-                .disabled(
-                    !vm.isGenerating
-                        && vm.inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                        && attachedImageURL == nil
-                        && attachedAudioURL == nil
-                )
+                .background(Color.white.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: 24))
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(.background)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .animation(.easeOut(duration: 0.2), value: isComposerFocused)
         }
+        .apolloScreenBackground()
         .navigationTitle(vm.chatSessions.first(where: { $0.id == vm.currentSessionId })?.title ?? settings.localized("chat"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -1126,6 +1514,18 @@ struct ChatScreen: View {
         }
         .sheet(isPresented: $showSettings) {
              ChatSettingsSheet(vm: vm)
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { previewImagePath != nil },
+            set: { isPresented in
+                if !isPresented {
+                    previewImagePath = nil
+                }
+            }
+        )) {
+            FullScreenImagePreview(path: previewImagePath) {
+                previewImagePath = nil
+            }
         }
         .sheet(isPresented: $showDrawer) {
             ChatDrawerPanel(
@@ -1210,13 +1610,16 @@ struct ChatScreen: View {
         .font(.caption)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(Color(.secondarySystemBackground))
+        .background(.ultraThinMaterial)
         .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+        )
     }
 
     private func writeAttachmentData(_ data: Data, preferredExtension: String) -> URL? {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("llmhub_attachments", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = attachmentStorageDirectory()
         let ext = preferredExtension.isEmpty ? "bin" : preferredExtension
         let url = dir.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
         do {
@@ -1228,8 +1631,7 @@ struct ChatScreen: View {
     }
 
     private func copyAttachmentToTemp(_ sourceURL: URL, preferredExtension: String) -> URL? {
-        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("llmhub_attachments", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let dir = attachmentStorageDirectory()
         let ext = preferredExtension.isEmpty ? sourceURL.pathExtension : preferredExtension
         let destinationURL = dir.appendingPathComponent(UUID().uuidString).appendingPathExtension(ext)
         let didStartScopedAccess = sourceURL.startAccessingSecurityScopedResource()
@@ -1249,6 +1651,10 @@ struct ChatScreen: View {
         }
     }
 
+    private func attachmentStorageDirectory() -> URL {
+        persistentAttachmentDirectoryURL()
+    }
+
     var emptyState: some View {
         VStack(spacing: 20) {
             Spacer(minLength: 60)
@@ -1266,27 +1672,29 @@ struct ChatScreen: View {
             
             Text(settings.localized("welcome_to_llm_hub"))
                 .font(.title2.bold())
+                .foregroundColor(.white)
                 
             if downloadedModels.isEmpty {
                 Text(settings.localized("no_models_downloaded"))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.68))
                 Button {
                     onNavigateToModels()
                 } label: {
                     Label(settings.localized("download_a_model"), systemImage: "arrow.down.circle")
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(ApolloIconButtonStyle())
             } else if vm.selectedModelName == settings.localized("no_model_selected") {
                 Text(settings.localized("load_model_to_start"))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.68))
             } else {
                 Text(vm.selectedModelName)
                     .font(.caption)
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Color.secondary.opacity(0.2))
+                    .background(Color.white.opacity(0.12))
                     .clipShape(Capsule())
+                    .foregroundColor(.white)
                 Text(settings.localized("start_chatting"))
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.68))
                     .multilineTextAlignment(.center)
             }
         }
@@ -1316,5 +1724,52 @@ struct ChatScreen: View {
                 return FileManager.default.fileExists(atPath: fileURL.path)
             }
         }
+    }
+}
+
+private struct FullScreenImagePreview: View {
+    let path: String?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            if let uiImage = loadImage() {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(20)
+            } else {
+                Text("Image unavailable")
+                    .foregroundColor(.white.opacity(0.9))
+                    .font(.headline)
+            }
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white.opacity(0.95))
+                    }
+                }
+                .padding(.top, 12)
+                .padding(.horizontal, 16)
+
+                Spacer()
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            onDismiss()
+        }
+    }
+
+    private func loadImage() -> UIImage? {
+        guard let resolvedURL = resolveStoredAttachmentURL(path) else { return nil }
+        return UIImage(contentsOfFile: resolvedURL.path)
     }
 }

@@ -5,11 +5,16 @@ struct ChatSettingsSheet: View {
     @ObservedObject var vm: ChatViewModel
     @EnvironmentObject var settings: AppSettings
     @Environment(\.dismiss) var dismiss
+    @State private var draftContextWindow: Double = 2048
+    @State private var draftMaxTokens: Double = 1024
+    @State private var draftTopK: Double = 64
+    @State private var draftTopP: Double = 0.95
+    @State private var draftTemperature: Double = 1.0
     
     var body: some View {
         NavigationView {
             ZStack {
-                Color(uiColor: .systemGroupedBackground).ignoresSafeArea()
+                ApolloLiquidBackground()
                 
                 ScrollView {
                     VStack(spacing: 20) {
@@ -18,15 +23,16 @@ struct ChatSettingsSheet: View {
                             HStack(alignment: .center, spacing: 14) {
                                 Image(systemName: "cpu")
                                     .font(.system(size: 26))
-                                    .foregroundColor(.indigo)
+                                    .foregroundColor(.blue.opacity(0.85))
                                     .frame(width: 32)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(settings.localized("select_model_title"))
                                         .font(.headline)
+                                        .foregroundColor(.white)
                                     Text(settings.localized("select_model"))
                                         .font(.caption)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.white.opacity(0.68))
                                 }
                                 .padding(.vertical, 4)
                                 
@@ -41,7 +47,7 @@ struct ChatSettingsSheet: View {
                                     }
                                 }
                                 .pickerStyle(.menu)
-                                .accentColor(.indigo)
+                                .accentColor(.blue.opacity(0.88))
                                 .labelsHidden()
                             }
                             .frame(maxWidth: .infinity)
@@ -52,7 +58,7 @@ struct ChatSettingsSheet: View {
                                 HStack {
                                     Label(settings.localized("currently_loaded"), systemImage: "bolt.circle.fill")
                                         .font(.subheadline)
-                                        .foregroundColor(.secondary)
+                                        .foregroundColor(.white.opacity(0.72))
                                     Spacer()
                                     if vm.selectedModelName == vm.loadedModelName {
                                         Text("✅ " + settings.localized("ready_to_chat"))
@@ -63,40 +69,59 @@ struct ChatSettingsSheet: View {
                             }
                         }
                         .padding()
-                        .background(Color(uiColor: .secondarySystemGroupedBackground))
+                        .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
 
                         // Model Configurations
                         VStack(alignment: .leading, spacing: 20) {
                             HStack {
                                 Image(systemName: "slider.horizontal.3")
-                                    .foregroundColor(.indigo)
+                                    .foregroundColor(.blue.opacity(0.86))
                                 Text(settings.localized("model_configs_title"))
                                     .font(.headline)
+                                    .foregroundColor(.white)
                             }
                             .padding(.bottom, 8)
                             
-                            configSlider(title: settings.localized("context_window_size"), value: $vm.contextWindow, range: 1...modelMaxContextWindow, format: "%.0f", subtitle: "max \(Int(modelMaxContextWindow))")
-                            configSlider(title: settings.localized("max_tokens"), value: $vm.maxTokens, range: 1...maxTokensCap, format: "%.0f", subtitle: "<= context")
-                            configSlider(title: settings.localized("top_k"), value: $vm.topK, range: 1...256, format: "%.0f")
-                            configSlider(title: settings.localized("top_p"), value: $vm.topP, range: 0...1, format: "%.2f")
-                            configSlider(title: settings.localized("temperature"), value: $vm.temperature, range: 0...2, format: "%.2f")
+                            ConfigSlider(title: settings.localized("context_window_size"), value: $draftContextWindow, range: 1...modelMaxContextWindow, format: "%.0f", subtitle: "max \(Int(modelMaxContextWindow))", step: contextWindowStep, onCommit: applyDraftToViewModel)
+                            ConfigSlider(title: settings.localized("max_tokens"), value: $draftMaxTokens, range: 1...draftMaxTokensCap, format: "%.0f", subtitle: "<= context", onCommit: applyDraftToViewModel)
+                            ConfigSlider(title: settings.localized("top_k"), value: $draftTopK, range: 1...256, format: "%.0f", onCommit: applyDraftToViewModel)
+                            ConfigSlider(title: settings.localized("top_p"), value: $draftTopP, range: 0...1, format: "%.2f", onCommit: applyDraftToViewModel)
+                            ConfigSlider(title: settings.localized("temperature"), value: $draftTemperature, range: 0...2, format: "%.2f", onCommit: applyDraftToViewModel)
+
+                            HStack {
+                                Spacer()
+                                Button(settings.localized("reset_to_defaults")) {
+                                    resetAllConfigsToDefaults()
+                                }
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.blue.opacity(0.92))
+                            }
                             
                         }
                         .padding()
-                        .background(Color(uiColor: .secondarySystemGroupedBackground))
+                        .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                        )
+                        .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
 
                         // Modality Toggle Tiles
                         if let model = currentModel, (model.supportsVision || model.supportsAudio || model.supportsThinking) {
                             VStack(alignment: .leading, spacing: 16) {
                                 HStack {
                                     Image(systemName: "sparkles")
-                                        .foregroundColor(.indigo)
+                                        .foregroundColor(.blue.opacity(0.86))
                                     Text(settings.localized("modality_options"))
                                         .font(.headline)
+                                        .foregroundColor(.white)
                                 }
                                 .padding(.bottom, 4)
                                 
@@ -111,9 +136,13 @@ struct ChatSettingsSheet: View {
                                 }
                             }
                             .padding()
-                            .background(Color(uiColor: .secondarySystemGroupedBackground))
+                            .background(.ultraThinMaterial)
                             .clipShape(RoundedRectangle(cornerRadius: 16))
-                            .shadow(color: .black.opacity(0.05), radius: 10, x: 0, y: 4)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 12, x: 0, y: 8)
                         }
                         
                         // Action Buttons
@@ -136,10 +165,10 @@ struct ChatSettingsSheet: View {
                                 }
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(vm.selectedModelName == settings.localized("no_model_selected") ? Color.gray : Color.indigo)
                                 .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                                .contentShape(Rectangle())
                             }
+                            .liquidGlassPrimaryButton(cornerRadius: 14)
                             .disabled(vm.isBackendLoading || vm.selectedModelName == settings.localized("no_model_selected"))
                             
                             if vm.loadedModelName != nil {
@@ -149,11 +178,15 @@ struct ChatSettingsSheet: View {
                                 }) {
                                     Text(settings.localized("unload_model"))
                                         .fontWeight(.medium)
-                                        .foregroundColor(.red)
+                                        .foregroundColor(.red.opacity(0.94))
                                         .frame(maxWidth: .infinity)
                                         .padding()
-                                        .background(Color.red.opacity(0.1))
+                                        .background(.ultraThinMaterial)
                                         .clipShape(RoundedRectangle(cornerRadius: 14))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .stroke(Color.red.opacity(0.34), lineWidth: 1)
+                                        )
                                 }
                             }
                         }
@@ -163,46 +196,24 @@ struct ChatSettingsSheet: View {
             }
             .navigationTitle(settings.localized("feature_settings_title"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(settings.localized("done")) { dismiss() }
                 }
             }
             .onAppear {
-                clampGenerationSettings()
+                syncDraftFromViewModel()
             }
             .onChange(of: vm.selectedModelName) { _ in
-                clampGenerationSettings()
+                syncDraftFromViewModel()
             }
-            .onChange(of: vm.contextWindow) { _ in
-                clampGenerationSettings()
-            }
-            .onChange(of: vm.maxTokens) { _ in
-                clampGenerationSettings()
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func configSlider(title: String, value: Binding<Double>, range: ClosedRange<Double>, format: String, subtitle: String? = nil) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(title)
-                    .font(.subheadline)
-                    .foregroundColor(.primary)
-                if let subtitle = subtitle {
-                    Text("(\(subtitle))")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+            .onChange(of: draftContextWindow) { _, newValue in
+                let cap = min(max(1, newValue), modelMaxContextWindow)
+                if draftMaxTokens > cap {
+                    draftMaxTokens = cap
                 }
-                Spacer()
-                Text(String(format: format, value.wrappedValue))
-                    .font(.system(.subheadline, design: .monospaced))
-                    .fontWeight(.bold)
-                    .foregroundColor(.indigo)
             }
-            Slider(value: value, in: range)
-                .accentColor(.indigo)
         }
     }
     
@@ -241,19 +252,99 @@ struct ChatSettingsSheet: View {
         return Double(max(1, advertised))
     }
 
-    private var maxTokensCap: Double {
-        min(max(1, vm.contextWindow), modelMaxContextWindow)
+    private var draftMaxTokensCap: Double {
+        min(max(1, draftContextWindow), modelMaxContextWindow)
     }
 
-    private func clampGenerationSettings() {
-        let clampedContext = min(max(1, vm.contextWindow), modelMaxContextWindow)
-        if clampedContext != vm.contextWindow {
-            vm.contextWindow = clampedContext
-        }
+    private var contextWindowStep: Double {
+        let maxWindow = max(1, Int(modelMaxContextWindow))
+        return Double(max(1, maxWindow / 1024))
+    }
 
-        let clampedMaxTokens = min(max(1, vm.maxTokens), maxTokensCap)
-        if clampedMaxTokens != vm.maxTokens {
-            vm.maxTokens = clampedMaxTokens
+    private func syncDraftFromViewModel() {
+        draftContextWindow = min(max(1, vm.contextWindow), modelMaxContextWindow)
+        draftMaxTokens = min(max(1, vm.maxTokens), min(max(1, draftContextWindow), modelMaxContextWindow))
+        draftTopK = min(max(1, vm.topK), 256)
+        draftTopP = min(max(0, vm.topP), 1)
+        draftTemperature = min(max(0, vm.temperature), 2)
+    }
+
+    private func applyDraftToViewModel() {
+        let clampedContext = min(max(1, draftContextWindow), modelMaxContextWindow)
+        let clampedMaxTokens = min(max(1, draftMaxTokens), min(max(1, clampedContext), modelMaxContextWindow))
+        let clampedTopK = min(max(1, draftTopK), 256)
+        let clampedTopP = min(max(0, draftTopP), 1)
+        let clampedTemperature = min(max(0, draftTemperature), 2)
+
+        draftContextWindow = clampedContext
+        draftMaxTokens = clampedMaxTokens
+        draftTopK = clampedTopK
+        draftTopP = clampedTopP
+        draftTemperature = clampedTemperature
+
+        vm.contextWindow = clampedContext
+        vm.maxTokens = clampedMaxTokens
+        vm.topK = clampedTopK
+        vm.topP = clampedTopP
+        vm.temperature = clampedTemperature
+    }
+
+    private func resetAllConfigsToDefaults() {
+        draftContextWindow = min(2048, modelMaxContextWindow)
+        draftMaxTokens = min(4096, min(max(1, draftContextWindow), modelMaxContextWindow))
+        draftTopK = 64
+        draftTopP = 0.95
+        draftTemperature = 1.0
+        applyDraftToViewModel()
+    }
+
+    private var draftedModels: [AIModel] {
+        downloadedModels
+    }
+}
+
+struct ConfigSlider: View {
+    let title: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let format: String
+    var subtitle: String? = nil
+    var step: Double? = nil
+    let onCommit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.white)
+                if let subtitle = subtitle {
+                    Text("(\(subtitle))")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.58))
+                }
+                Spacer()
+                Text(String(format: format, value))
+                    .font(.system(.subheadline, design: .monospaced))
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.92))
+            }
+            Group {
+                if let step {
+                    Slider(value: $value, in: range, step: step) { editing in
+                        if !editing {
+                            onCommit()
+                        }
+                    }
+                } else {
+                    Slider(value: $value, in: range) { editing in
+                        if !editing {
+                            onCommit()
+                        }
+                    }
+                }
+            }
+            .tint(.white.opacity(0.92))
         }
     }
 }
@@ -266,14 +357,43 @@ struct ToggleTile: View {
     var body: some View {
         HStack {
             Image(systemName: icon)
-                .foregroundColor(.indigo.opacity(0.6))
+                .foregroundColor(.blue.opacity(0.75))
                 .frame(width: 24)
             Text(title)
                 .font(.subheadline)
+                .foregroundColor(.white)
             Spacer()
             Toggle("", isOn: $isOn)
                 .labelsHidden()
-                .tint(.green)
+                .tint(.white.opacity(0.9))
         }
+    }
+}
+
+private extension View {
+    func liquidGlassPrimaryButton(cornerRadius: CGFloat = 12) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+
+        return self
+            .foregroundStyle(.white)
+            .background(shape.fill(.ultraThinMaterial))
+            .clipShape(shape)
+            .contentShape(shape)
+            .overlay(
+                shape
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.10), Color.white.opacity(0.03)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .allowsHitTesting(false)
+            )
+            .overlay(
+                shape
+                    .stroke(Color.white.opacity(0.22), lineWidth: 1)
+                    .allowsHitTesting(false)
+            )
     }
 }

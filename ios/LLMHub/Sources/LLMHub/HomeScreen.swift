@@ -14,18 +14,19 @@ struct HomeScreen: View {
     var onNavigateToChat: () -> Void
     var onNavigateToModels: () -> Void
     var onNavigateToSettings: () -> Void
+    var onNavigateToRoute: (String) -> Void
     @State private var githubStars: Int? = nil
 
     var features: [FeatureCard] {
         [
-            FeatureCard(titleKey: "feature_ai_chat", descriptionKey: "feature_ai_chat_desc", iconSystemName: "bubble.left.and.bubble.right.fill", gradient: [Color(hex: "667eea"), Color(hex: "764ba2")], route: "chat"),
-            FeatureCard(titleKey: "feature_writing_aid", descriptionKey: "feature_writing_aid_desc", iconSystemName: "pencil.line", gradient: [Color(hex: "f093fb"), Color(hex: "f5576c")], route: "writing_aid"),
-            FeatureCard(titleKey: "feature_translator", descriptionKey: "feature_translator_desc", iconSystemName: "network", gradient: [Color(hex: "4facfe"), Color(hex: "00f2fe")], route: "translator"),
-            FeatureCard(titleKey: "feature_transcriber", descriptionKey: "feature_transcriber_desc", iconSystemName: "mic.fill", gradient: [Color(hex: "43e97b"), Color(hex: "38f9d7")], route: "transcriber"),
-            FeatureCard(titleKey: "feature_scam_detector", descriptionKey: "feature_scam_detector_desc", iconSystemName: "shield.fill", gradient: [Color(hex: "fa709a"), Color(hex: "fee140")], route: "scam_detector"),
-            FeatureCard(titleKey: "feature_image_generator", descriptionKey: "feature_image_generator_desc", iconSystemName: "paintpalette.fill", gradient: [Color(hex: "6a11cb"), Color(hex: "2575fc")], route: "image_generator"),
-            FeatureCard(titleKey: "feature_vibe_coder", descriptionKey: "feature_vibe_coder_desc", iconSystemName: "chevron.left.slash.chevron.right", gradient: [Color(hex: "f794a4"), Color(hex: "fdd6bd")], route: "vibe_coder"),
-            FeatureCard(titleKey: "feature_creator_generation", descriptionKey: "feature_creator_generation_desc", iconSystemName: "sparkles", gradient: [Color(hex: "8EC5FC"), Color(hex: "E0C3FC")], route: "creator_generation")
+            FeatureCard(titleKey: "feature_ai_chat", descriptionKey: "feature_ai_chat_desc", iconSystemName: "bubble.left.and.bubble.right.fill", gradient: [Color(hex: "7ea3ff"), Color(hex: "5e79da")], route: "chat"),
+            FeatureCard(titleKey: "feature_writing_aid", descriptionKey: "feature_writing_aid_desc", iconSystemName: "pencil.line", gradient: [Color(hex: "91d4ff"), Color(hex: "4e86d5")], route: "writing_aid"),
+            FeatureCard(titleKey: "feature_translator", descriptionKey: "feature_translator_desc", iconSystemName: "network", gradient: [Color(hex: "84f1cf"), Color(hex: "4aa897")], route: "translator"),
+            FeatureCard(titleKey: "feature_transcriber", descriptionKey: "feature_transcriber_desc", iconSystemName: "mic.fill", gradient: [Color(hex: "b4b2ff"), Color(hex: "6f77cf")], route: "transcriber"),
+            FeatureCard(titleKey: "feature_scam_detector", descriptionKey: "feature_scam_detector_desc", iconSystemName: "shield.fill", gradient: [Color(hex: "ffb08a"), Color(hex: "d77c59")], route: "scam_detector"),
+            FeatureCard(titleKey: "feature_image_generator", descriptionKey: "feature_image_generator_desc", iconSystemName: "paintpalette.fill", gradient: [Color(hex: "9cc3ff"), Color(hex: "5b86d2")], route: "image_generator"),
+            FeatureCard(titleKey: "feature_vibe_coder", descriptionKey: "feature_vibe_coder_desc", iconSystemName: "chevron.left.slash.chevron.right", gradient: [Color(hex: "a8bcff"), Color(hex: "5f76be")], route: "vibe_coder"),
+            FeatureCard(titleKey: "feature_creator_generation", descriptionKey: "feature_creator_generation_desc", iconSystemName: "sparkles", gradient: [Color(hex: "9dc5e6"), Color(hex: "6586ae")], route: "creator_generation")
         ]
     }
 
@@ -73,7 +74,7 @@ struct HomeScreen: View {
                 HStack(spacing: 12) {
                     Text(settings.localized("app_name"))
                         .font(.title.bold())
-                        .foregroundColor(.primary)
+                        .foregroundColor(.white)
 
                     Spacer()
 
@@ -95,6 +96,7 @@ struct HomeScreen: View {
                             Image(systemName: "arrow.down.circle")
                                 .font(.system(size: 22))
                         }
+                        .buttonStyle(ApolloIconButtonStyle())
 
                         Button {
                             onNavigateToSettings()
@@ -102,6 +104,7 @@ struct HomeScreen: View {
                             Image(systemName: "gearshape")
                                 .font(.system(size: 22))
                         }
+                        .buttonStyle(ApolloIconButtonStyle())
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 7)
@@ -110,14 +113,14 @@ struct HomeScreen: View {
                         Capsule()
                             .stroke(
                                 LinearGradient(
-                                    colors: [Color.white.opacity(0.36), Color.white.opacity(0.10)],
+                                    colors: [Color.white.opacity(0.35), Color.white.opacity(0.08)],
                                     startPoint: .top,
                                     endPoint: .bottom
                                 ),
                                 lineWidth: 1
                             )
                     )
-                    .shadow(color: .white.opacity(0.12), radius: 10, x: 0, y: 0)
+                    .shadow(color: .black.opacity(0.32), radius: 10, x: 0, y: 6)
                     .clipShape(Capsule())
                 }
                 .padding(.horizontal, horizontalPadding)
@@ -128,10 +131,14 @@ struct HomeScreen: View {
                     LazyVGrid(columns: columns, spacing: spacing) {
                         ForEach(features, id: \.route) { feature in
                             Button {
-                                if feature.route == "chat" {
+                                switch feature.route {
+                                case "chat":
                                     onNavigateToChat()
+                                case "writing_aid", "scam_detector", "vibe_coder":
+                                    onNavigateToRoute(feature.route)
+                                default:
+                                    break
                                 }
-                                // Other routes: coming soon
                             } label: {
                                 FeatureCardView(feature: feature)
                                     .frame(width: cardWidth, height: cardHeight)
@@ -144,6 +151,7 @@ struct HomeScreen: View {
                     .padding(.bottom, gridBottomPadding)
                 }
             }
+            .padding(.bottom, 2)
             .onAppear {
                 if githubStars == nil {
                     Task {
@@ -152,6 +160,7 @@ struct HomeScreen: View {
                 }
             }
         }
+        .apolloScreenBackground()
         .toolbar(.hidden, for: .navigationBar)
     }
 
@@ -184,11 +193,15 @@ struct FeatureCardView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.25))
+                    .fill(.ultraThinMaterial)
                     .frame(width: 56, height: 56)
+                    .overlay(
+                        Circle()
+                            .stroke(Color.white.opacity(0.24), lineWidth: 1)
+                    )
 
                 Image(systemName: feature.iconSystemName)
-                    .font(.system(size: 26))
+                    .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.white)
             }
 
@@ -214,9 +227,22 @@ struct FeatureCardView: View {
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
+            .opacity(0.18)
         )
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 20))
-        .shadow(color: feature.gradient.first?.opacity(0.4) ?? .clear, radius: 8, x: 0, y: 4)
+        .overlay(
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.35), Color.white.opacity(0.06)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: .black.opacity(0.35), radius: 10, x: 0, y: 8)
     }
 }
 

@@ -375,7 +375,7 @@ struct ModelRowView: View {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(model.name)
                             .font(.subheadline.bold())
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                             .lineLimit(2)
 
                         HStack(spacing: 6) {
@@ -384,12 +384,12 @@ struct ModelRowView: View {
                                 .foregroundColor(.secondary)
                             Text(model.sizeLabel)
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.62))
                             Text("•")
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.52))
                             Text(String(format: settings.localized("ram_requirement_format"), Int(model.requirements.minRamGB)))
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.62))
                         }
 
                         // Capability badges
@@ -410,7 +410,7 @@ struct ModelRowView: View {
 
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.56))
                 }
                 .padding(.vertical, 12)
                 .padding(.horizontal, 16)
@@ -531,8 +531,12 @@ struct ModelRowView: View {
                 .padding(.bottom, 12)
             }
         }
-        .background(Color(.secondarySystemBackground))
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+        )
     }
 
     private var categoryGradient: LinearGradient {
@@ -600,103 +604,115 @@ struct ModelDownloadScreen: View {
     var onNavigateBack: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Category Tabs
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(ModelCategory.allCases, id: \.self) { cat in
-                        CategoryTab(
-                            category: cat,
-                            isSelected: vm.selectedCategory == cat,
-                            count: vm.models.filter { $0.category == cat }.count
-                        ) {
-                            withAnimation(.spring(response: 0.3)) {
-                                vm.selectedCategory = cat
+        ZStack {
+            ApolloLiquidBackground()
+
+            VStack(spacing: 0) {
+                // Category Tabs
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(ModelCategory.allCases, id: \.self) { cat in
+                            CategoryTab(
+                                category: cat,
+                                isSelected: vm.selectedCategory == cat,
+                                count: vm.models.filter { $0.category == cat }.count
+                            ) {
+                                withAnimation(.spring(response: 0.3)) {
+                                    vm.selectedCategory = cat
+                                }
                             }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-            }
-            .background(.thinMaterial)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.08))
+                        .frame(height: 1)
+                }
 
 
-
-            // Model list
-            ScrollView {
-                LazyVStack(spacing: 12) {
-                    if vm.filteredModels.isEmpty {
-                        VStack(spacing: 16) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 48))
-                                .foregroundColor(.secondary.opacity(0.5))
-                            Text(settings.localized("no_models_available"))
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 60)
-                    } else {
-                        ForEach(vm.groupedFilteredModels) { family in
-                            VStack(alignment: .leading, spacing: 10) {
-                                Button {
-                                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
-                                        vm.toggleFamily(family.title)
+                // Model list
+                ScrollView {
+                    LazyVStack(spacing: 12) {
+                        if vm.filteredModels.isEmpty {
+                            VStack(spacing: 16) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 48))
+                                    .foregroundColor(.white.opacity(0.45))
+                                Text(settings.localized("no_models_available"))
+                                    .foregroundColor(.white.opacity(0.72))
+                            }
+                            .padding(.top, 60)
+                        } else {
+                            ForEach(vm.groupedFilteredModels) { family in
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Button {
+                                        withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                                            vm.toggleFamily(family.title)
+                                        }
+                                    } label: {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: "folder.fill")
+                                                .foregroundColor(.blue.opacity(0.85))
+                                            Text(family.title)
+                                                .font(.subheadline.bold())
+                                                .foregroundColor(.white)
+                                            Text("(\(family.models.count))")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.6))
+                                            Spacer()
+                                            Image(systemName: vm.expandedFamilyTitle == family.title ? "chevron.up" : "chevron.down")
+                                                .font(.caption)
+                                                .foregroundColor(.white.opacity(0.55))
+                                        }
+                                        .padding(.horizontal, 14)
+                                        .padding(.vertical, 12)
+                                        .background(.ultraThinMaterial)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12)
+                                                .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                                        )
                                     }
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Image(systemName: "folder.fill")
-                                            .foregroundColor(.indigo)
-                                        Text(family.title)
-                                            .font(.subheadline.bold())
-                                            .foregroundColor(.primary)
-                                        Text("(\(family.models.count))")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                        Spacer()
-                                        Image(systemName: vm.expandedFamilyTitle == family.title ? "chevron.up" : "chevron.down")
-                                            .font(.caption)
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .padding(.horizontal, 14)
-                                    .padding(.vertical, 12)
-                                    .background(Color(.secondarySystemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                }
-                                .buttonStyle(.plain)
+                                    .buttonStyle(.plain)
 
-                                if vm.expandedFamilyTitle == family.title {
-                                    ForEach(family.models) { model in
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(vm.quantizationLabel(for: model))
-                                                .font(.caption.bold())
-                                                .foregroundColor(.indigo)
-                                                .padding(.horizontal, 4)
+                                    if vm.expandedFamilyTitle == family.title {
+                                        ForEach(family.models) { model in
+                                            VStack(alignment: .leading, spacing: 6) {
+                                                Text(vm.quantizationLabel(for: model))
+                                                    .font(.caption.bold())
+                                                    .foregroundColor(.white.opacity(0.72))
+                                                    .padding(.horizontal, 4)
 
-                                            ModelRowView(
-                                                model: model,
-                                                state: vm.downloadStates[model.id] ?? .notDownloaded,
-                                                isExpanded: vm.expandedModelId == model.id,
-                                                onDownload: { vm.startDownload(model) },
-                                                onPause:    { vm.pauseDownload(model.id) },
-                                                onResume:   { vm.resumeDownload(model.id) },
-                                                onDelete:   { vm.deleteModel(model.id) },
-                                                onExpand:   { vm.toggleExpand(model.id) }
-                                            )
+                                                ModelRowView(
+                                                    model: model,
+                                                    state: vm.downloadStates[model.id] ?? .notDownloaded,
+                                                    isExpanded: vm.expandedModelId == model.id,
+                                                    onDownload: { vm.startDownload(model) },
+                                                    onPause:    { vm.pauseDownload(model.id) },
+                                                    onResume:   { vm.resumeDownload(model.id) },
+                                                    onDelete:   { vm.deleteModel(model.id) },
+                                                    onExpand:   { vm.toggleExpand(model.id) }
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 24)
+                    .padding(.bottom, 24)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 24)
-                .padding(.bottom, 24)
             }
         }
-        .background(Color(.systemGroupedBackground))
         .navigationTitle(settings.localized("ai_models"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -745,9 +761,13 @@ struct CategoryTab: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(isSelected ? AnyShapeStyle(.indigo.gradient) : AnyShapeStyle(Color(.secondarySystemBackground)))
-            .foregroundColor(isSelected ? .white : .primary)
+            .background(isSelected ? AnyShapeStyle(LinearGradient(colors: [Color.blue.opacity(0.85), Color(hex: "5f77b8")], startPoint: .topLeading, endPoint: .bottomTrailing)) : AnyShapeStyle(.ultraThinMaterial))
+            .foregroundColor(isSelected ? .white : .white.opacity(0.78))
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color.white.opacity(isSelected ? 0.24 : 0.12), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

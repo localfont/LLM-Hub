@@ -8,88 +8,91 @@ struct SettingsScreen: View {
     var onNavigateBack: () -> Void
     var onNavigateToModels: () -> Void
 
-    @State private var showThemeDialog = false
     @State private var showLanguageDialog = false
     var body: some View {
-        List {
-            // MARK: Models Section
-            Section {
-                SettingsRow(
-                    icon: "square.and.arrow.down.fill",
-                    iconColor: .indigo,
-                    titleKey: "download_models",
-                    subtitleKey: "browse_download_models"
-                ) {
-                    onNavigateToModels()
-                }
-            } header: {
-                SectionHeader(titleKey: "models", icon: "cpu")
-            }
+        ZStack {
+            ApolloLiquidBackground()
 
-
-            // MARK: Appearance Section
-            Section {
-                SettingsRow(
-                    icon: "paintpalette.fill",
-                    iconColor: .purple,
-                    titleKey: "theme",
-                    subtitleString: settings.localized(settings.theme.displayNameKey)
-                ) {
-                    showThemeDialog = true
-                }
-
-                SettingsRow(
-                    icon: "globe",
-                    iconColor: .blue,
-                    titleKey: "language",
-                    subtitleString: settings.localized(settings.selectedLanguage.displayNameKey)
-                ) {
-                    showLanguageDialog = true
-                }
-            } header: {
-                SectionHeader(titleKey: "appearance", icon: "paintbrush")
-            }
-
-            // MARK: Information Section
-            Section {
-                SettingsRow(
-                    icon: "info.circle.fill",
-                    iconColor: .blue,
-                    titleKey: "about",
-                    subtitleKey: "app_information_contact"
-                ) { /* Navigate to About */ }
-
-                SettingsRow(
-                    icon: "doc.text.fill",
-                    iconColor: .gray,
-                    titleKey: "terms_of_service",
-                    subtitleKey: "legal_terms_conditions"
-                ) { /* Navigate to TOS */ }
-            } header: {
-                SectionHeader(titleKey: "information", icon: "info.circle")
-            }
-
-            // MARK: Source Code Section
-            Section {
-                SettingsRow(
-                    icon: "chevron.left.forwardslash.chevron.right",
-                    iconColor: .gray,
-                    titleKey: "github_repository",
-                    subtitleKey: "view_source_contribute"
-                ) {
-                    if let url = URL(string: "https://github.com/timmyy123/LLM-Hub") {
-                        openURL(url)
+            List {
+                // MARK: Models Section
+                Section {
+                    SettingsRow(
+                        icon: "square.and.arrow.down.fill",
+                        iconColor: .indigo,
+                        titleKey: "download_models",
+                        subtitleKey: "browse_download_models"
+                    ) {
+                        onNavigateToModels()
                     }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                    .listRowBackground(Color.clear)
+                } header: {
+                    SectionHeader(titleKey: "models", icon: "cpu")
                 }
-            } header: {
-                SectionHeader(titleKey: "source_code_section", icon: "curlybraces")
+
+                // MARK: Appearance Section
+                Section {
+                    SettingsRow(
+                        icon: "globe",
+                        iconColor: .blue,
+                        titleKey: "language",
+                        subtitleString: settings.localized(settings.selectedLanguage.displayNameKey)
+                    ) {
+                        showLanguageDialog = true
+                    }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                    .listRowBackground(Color.clear)
+                } header: {
+                    SectionHeader(titleKey: "appearance", icon: "paintbrush")
+                }
+
+                // MARK: Information Section
+                Section {
+                    SettingsRow(
+                        icon: "info.circle.fill",
+                        iconColor: .blue,
+                        titleKey: "about",
+                        subtitleKey: "app_information_contact"
+                    ) { }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                    .listRowBackground(Color.clear)
+
+                    SettingsRow(
+                        icon: "doc.text.fill",
+                        iconColor: .gray,
+                        titleKey: "terms_of_service",
+                        subtitleKey: "legal_terms_conditions"
+                    ) { }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                    .listRowBackground(Color.clear)
+                } header: {
+                    SectionHeader(titleKey: "information", icon: "info.circle")
+                }
+
+                // MARK: Source Code Section
+                Section {
+                    SettingsRow(
+                        icon: "chevron.left.forwardslash.chevron.right",
+                        iconColor: .gray,
+                        titleKey: "github_repository",
+                        subtitleKey: "view_source_contribute"
+                    ) {
+                        if let url = URL(string: "https://github.com/timmyy123/LLM-Hub") {
+                            openURL(url)
+                        }
+                    }
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
+                    .listRowBackground(Color.clear)
+                } header: {
+                    SectionHeader(titleKey: "source_code_section", icon: "curlybraces")
+                }
             }
-
-
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
-        .listStyle(.insetGrouped)
         .navigationTitle(settings.localized("feature_settings_title"))
         .navigationBarTitleDisplayMode(.large)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarLeading) {
                 Button {
@@ -101,22 +104,6 @@ struct SettingsScreen: View {
                     }
                 }
             }
-        }
-        // Theme Dialog
-        .confirmationDialog(settings.localized("choose_theme"), isPresented: $showThemeDialog, titleVisibility: .visible) {
-            ForEach(AppTheme.allCases) { theme in
-                Button {
-                    settings.theme = theme
-                } label: {
-                    HStack {
-                        Text(settings.localized(theme.displayNameKey))
-                        if settings.theme == theme {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-            Button(settings.localized("cancel"), role: .cancel) {}
         }
         // Language Dialog
         .sheet(isPresented: $showLanguageDialog) {
@@ -132,27 +119,36 @@ struct LanguagePickerSheet: View {
     @Environment(\.dismiss) var dismiss
 
     var body: some View {
-        List {
-            ForEach(AppLanguage.allCases) { lang in
-                Button {
-                    settings.selectedLanguage = lang
-                    dismiss()
-                } label: {
-                    HStack {
-                        Text(settings.localized(lang.displayNameKey))
-                            .foregroundColor(.primary)
-                            .environment(\.layoutDirection, lang.isRTL ? .rightToLeft : .leftToRight)
-                        Spacer()
-                        if settings.selectedLanguage == lang {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.indigo)
+        ZStack {
+            ApolloLiquidBackground()
+
+            List {
+                ForEach(AppLanguage.allCases) { lang in
+                    Button {
+                        settings.selectedLanguage = lang
+                        dismiss()
+                    } label: {
+                        HStack {
+                            Text(settings.localized(lang.displayNameKey))
+                                .foregroundColor(.white)
+                                .environment(\.layoutDirection, lang.isRTL ? .rightToLeft : .leftToRight)
+                            Spacer()
+                            if settings.selectedLanguage == lang {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.blue.opacity(0.9))
+                            }
                         }
                     }
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 6, leading: 14, bottom: 6, trailing: 14))
                 }
             }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
         }
         .navigationTitle(settings.localized("select_language"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button(settings.localized("done")) { dismiss() }
@@ -176,7 +172,7 @@ struct SectionHeader: View {
         }
 
         .font(.footnote.bold())
-        .foregroundColor(.secondary)
+        .foregroundColor(.white.opacity(0.74))
         .textCase(nil)
     }
 }
@@ -205,16 +201,16 @@ struct SettingsRow: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(settings.localized(titleKey))
                         .font(.subheadline)
-                        .foregroundColor(.primary)
+                        .foregroundColor(.white)
                     if let sk = subtitleKey {
                         Text(settings.localized(sk))
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.65))
                             .lineLimit(1)
                     } else if let ss = subtitleString {
                         Text(verbatim: ss)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.65))
                             .lineLimit(1)
                     }
                 }
@@ -223,8 +219,16 @@ struct SettingsRow: View {
 
                 Image(systemName: "chevron.right")
                     .font(.caption.bold())
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.55))
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

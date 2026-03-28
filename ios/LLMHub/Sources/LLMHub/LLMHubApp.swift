@@ -17,7 +17,7 @@ struct LLMHubApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(settings)
-                .preferredColorScheme(settings.theme.colorScheme)
+                .preferredColorScheme(.dark)
                 .environment(\.locale, settings.selectedLanguage.locale)
                 .environment(\.layoutDirection, settings.selectedLanguage.isRTL ? .rightToLeft : .leftToRight)
         }

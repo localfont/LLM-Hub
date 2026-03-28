@@ -28,6 +28,7 @@ class LLMBackend: ObservableObject {
 
     private var isSDKInitialized = false
     private var areModelsRegistered = false
+    private var loadedLLMModelId: String?
     private var loadedVLMModelId: String?
     private var loadedVLMProjectorPath: String?
 
@@ -95,12 +96,29 @@ class LLMBackend: ObservableObject {
             return []
         }
 
-        return contents.filter { $0.pathExtension.lowercased() == "gguf" }
+        return contents
+            .filter { $0.pathExtension.lowercased() == "gguf" }
+            .sorted { $0.lastPathComponent.lowercased() < $1.lastPathComponent.lowercased() }
     }
 
     private func resolveModelGGUFPath(for model: AIModel) throws -> String {
         let folderURL = try SimplifiedFileManager.shared.getModelFolderURL(modelId: model.id, framework: model.inferenceFramework)
         let files = listGGUFFiles(in: folderURL)
+
+        if let modelURL = URL(string: model.url) {
+            let preferredFilename = filename(from: modelURL).lowercased()
+            if let exact = files.first(where: { $0.lastPathComponent.lowercased() == preferredFilename }) {
+                return exact.path
+            }
+        }
+
+        if let quantTag = quantizationTag(from: model.name),
+           let quantMatched = files.first(where: {
+               let lower = $0.lastPathComponent.lowercased()
+               return !lower.contains("mmproj") && lower.contains(quantTag)
+           }) {
+            return quantMatched.path
+        }
 
         if let preferred = files.first(where: { !$0.lastPathComponent.lowercased().contains("mmproj") }) {
             return preferred.path
@@ -190,16 +208,104 @@ class LLMBackend: ObservableObject {
             )
         }
 
+        let modelSummary = fileSummary(at: modelPath)
+        let projectorSummary = fileSummary(at: mmprojPath)
+        let modelHeader = ggufHeaderSummary(at: modelPath)
+        let projectorHeader = ggufHeaderSummary(at: mmprojPath)
+
+        print("[LLMBackend] VLM prepare model=\(model.id) main={\(modelSummary)} header={\(modelHeader)} mmproj={\(projectorSummary)} header={\(projectorHeader)}")
+
+        guard modelHeader == "GGUF" else {
+            throw NSError(
+                domain: "LLMBackend",
+                code: -103,
+                userInfo: [NSLocalizedDescriptionKey: "Main model file is invalid: \(modelSummary) header=\(modelHeader)"]
+            )
+        }
+
+        guard projectorHeader == "GGUF" else {
+            throw NSError(
+                domain: "LLMBackend",
+                code: -104,
+                userInfo: [NSLocalizedDescriptionKey: "Vision projector file is invalid: \(projectorSummary) header=\(projectorHeader)"]
+            )
+        }
+
         let shouldReload = !((await RunAnywhere.isVLMModelLoaded)
             && loadedVLMModelId == model.id
             && loadedVLMProjectorPath == mmprojPath)
 
         guard shouldReload else { return }
 
+        if await RunAnywhere.isModelLoaded {
+            do {
+                try await RunAnywhere.unloadModel()
+                loadedLLMModelId = nil
+                print("[LLMBackend] Unloaded text LLM before VLM load to avoid duplicate model residency")
+            } catch {
+                print("[LLMBackend] Failed to unload text LLM before VLM load: \(error)")
+            }
+        }
+
         await RunAnywhere.unloadVLMModel()
-        try await RunAnywhere.loadVLMModel(modelPath, mmprojPath: mmprojPath, modelId: model.id, modelName: model.name)
+        do {
+            try await RunAnywhere.loadVLMModel(modelPath, mmprojPath: mmprojPath, modelId: model.id, modelName: model.name)
+        } catch {
+            let details = "main={\(modelSummary)} header={\(modelHeader)} mmproj={\(projectorSummary)} header={\(projectorHeader)}"
+            throw NSError(
+                domain: "LLMBackend",
+                code: -111,
+                userInfo: [NSLocalizedDescriptionKey: "VLM load failed for \(model.name): \(error.localizedDescription). \(details)"]
+            )
+        }
         loadedVLMModelId = model.id
         loadedVLMProjectorPath = mmprojPath
+    }
+
+    private func ensureTextModelLoaded(for model: AIModel) async throws {
+        if await RunAnywhere.isVLMModelLoaded {
+            await RunAnywhere.unloadVLMModel()
+            loadedVLMModelId = nil
+            loadedVLMProjectorPath = nil
+            print("[LLMBackend] Unloaded VLM before text generation to avoid duplicate model residency")
+        }
+
+        let shouldLoad = !((await RunAnywhere.isModelLoaded) && loadedLLMModelId == model.id)
+        guard shouldLoad else { return }
+
+        try await RunAnywhere.loadModel(model.id)
+        loadedLLMModelId = model.id
+    }
+
+    private func fileSummary(at path: String) -> String {
+        let url = URL(fileURLWithPath: path)
+        let name = url.lastPathComponent
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            return "\(name) missing"
+        }
+
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        let size = (attributes?[.size] as? NSNumber)?.int64Value ?? -1
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useGB, .useMB, .useKB]
+        formatter.countStyle = .file
+        let sizeLabel = size >= 0 ? formatter.string(fromByteCount: size) : "unknown"
+
+        return "\(name) \(sizeLabel)"
+    }
+
+    private func ggufHeaderSummary(at path: String) -> String {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return "unreadable" }
+        defer {
+            try? handle.close()
+        }
+
+        let data = handle.readData(ofLength: 4)
+        guard data.count == 4, let header = String(data: data, encoding: .ascii) else {
+            return "invalid"
+        }
+        return header
     }
 
 #if canImport(UIKit)
@@ -244,7 +350,7 @@ class LLMBackend: ObservableObject {
 
     private func registerModel(_ model: AIModel, contextLengthOverride: Int? = nil) {
         guard let primaryURL = URL(string: model.url) else { return }
-        let contextLength = contextLengthOverride ?? modelMaxContextWindow(for: model)
+        _ = contextLengthOverride
 
         if model.additionalFiles.isEmpty {
             RunAnywhere.registerModel(
@@ -254,7 +360,6 @@ class LLMBackend: ObservableObject {
                 framework: framework(for: model),
                 modality: model.supportsVision ? .multimodal : .language,
                 memoryRequirement: model.sizeBytes,
-                contextLength: contextLength,
                 supportsThinking: model.supportsThinking
             )
             return
@@ -270,8 +375,7 @@ class LLMBackend: ObservableObject {
             files: descriptors,
             framework: framework(for: model),
             modality: model.supportsVision ? .multimodal : .language,
-            memoryRequirement: model.sizeBytes,
-            contextLength: contextLength
+            memoryRequirement: model.sizeBytes
         )
     }
 
@@ -316,6 +420,9 @@ class LLMBackend: ObservableObject {
         isLoaded = true
         currentlyLoadedModel = model.name
         loadedContextWindow = effectiveContext
+        loadedLLMModelId = model.id
+        loadedVLMModelId = nil
+        loadedVLMProjectorPath = nil
     }
 
     func unloadModel() {
@@ -330,6 +437,7 @@ class LLMBackend: ObservableObject {
                 self.isLoaded = false
                 self.currentlyLoadedModel = nil
                 self.loadedContextWindow = nil
+                self.loadedLLMModelId = nil
                 self.loadedVLMModelId = nil
                 self.loadedVLMProjectorPath = nil
             }
@@ -386,6 +494,10 @@ class LLMBackend: ObservableObject {
             let result = try await streamResult.metrics.value
             onUpdate(currentOutput, result.completionTokens, result.tokensPerSecond)
             return
+        }
+
+        if let model = loadedAIModel() {
+            try await ensureTextModelLoaded(for: model)
         }
 
         print("[LLMBackend] generate visionEnabled=\(enableVision) audioEnabled=\(enableAudio) images=0 videos=0")
