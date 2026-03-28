@@ -24,6 +24,8 @@ jobs:
       working-directory: ios/runanywhere-sdks-latest/Playground/android-use-agent
       run: |
         chmod +x gradlew
+        echo "android.useAndroidX=true" > gradle.properties
+        echo "android.enableJetifier=true" >> gradle.properties
         ./gradlew assembleDebug
 
     - name: Upload APK
